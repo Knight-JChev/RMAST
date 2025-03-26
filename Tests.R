@@ -82,8 +82,14 @@ legend(location, legend = paste("Clade absent in", tree2), pch = 19, col = "blue
 
 nodepath(taxo, from=MRCA, to=le_plus_a_droite)
 
-# Extraire un sous arbre en donnant le nom du noeud
-test = extract.clade (taxo, 23)
-plot(test)
-nodelabels()
-tiplabels()
+# Prendre et manipuler des sous arbres ####
+phyloNodes = phylo$node.label
+phyloNodesNum = unique(phylo$edge[,1]) # liste des numéro des noeuds internes
+phyloLeaf = phylo$tip.label # liste des noms des feuilles
+
+df = as.data.frame(phylo$edge)
+df = df %>%
+  rename("from"="V1","to"="V2") %>%
+  mutate(from = recode(from, !!!setNames(phyloNodes, phyloNodesNum))) %>%
+  mutate(to = recode(to, !!!setNames(phyloNodes, phyloNodesNum))) %>%
+  mutate(to = recode(to, !!!setNames(phyloLeaf, phyloLeafNum)))
