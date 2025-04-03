@@ -2,15 +2,14 @@ library(ape)
 library(dplyr)
 library(stringr)
 library(RcppHungarian)
-
 # Fonction pour faire la phylo et la taxo.
 # Retourne un vecteur avec taxo, phylo, arbre d'origine
-createTaxPhy <- function(NbLeaves = 10){
-  world = rtree(NbLeaves, rooted = FALSE)
+createTaxPhy <- function(nbLeaves = 10, nb.move = 1){
+  world = rtree(nbLeaves, rooted = FALSE)
   (q1 = summary(world$edge.length)[2])
-  ttt = sample(2:(world$Nnode-1), size = 2, replace = F)
-  tip1 = ttt[1]
-  tip2 = ttt[2]
+  ttt = sample(2:(world$Nnode-1), size = 2*nb.move, replace = F)
+  tip1 = ttt[1:nb.move]
+  tip2 = ttt[(nb.move+1):(nb.move*2)]
   
   
   # Dichotomie vers polytomie ####
@@ -24,26 +23,27 @@ createTaxPhy <- function(NbLeaves = 10){
   #' [Visu taxo et phylo]
   layout(matrix(c(1,2,3),1,3)) # Matrice pour tracer les plots
   
-  plot(world, cex = 1.2, main = "World")
+  plot(world, cex = 1.5, main = "World", font = 2)
   nodelabels(world$node.label, adj = c(1.3,-0.5), frame = "n", cex = 1.5, font = 2, col="red")
-  tiplabels(world$tip.label, adj = c(-2,0.3), frame = "n", cex = 1.5, font = 2, col="green")
-  tiplabels(world$tip.label[tip1], tip1, adj=0)
-  tiplabels(world$tip.label[tip2], tip2, adj=0, bg = "lightblue")
+  tiplabels(world$tip.label[tip1], tip1, adj=0, font = 2, cex = 1.2)
+  tiplabels(world$tip.label[tip2], tip2, adj=0, bg = "lightblue", font = 2, cex = 1.2)
   
   taxo = drop.tip(world, tip1) # Enlever une feuille
-  tipToChange = which(taxo$tip.label==world$tip.label[tip2])
-  plot(taxo, main = "Taxo", cex = 1.2)
+  tipToChange = match(world$tip.label[tip2], taxo$tip.label)
+  taxo = makeNodeLabel(taxo, method = "number", prefix = "tax")
+  plot(taxo, main = "Taxo", cex = 1.2, font = 2)
   nodelabels(taxo$node.label, adj = c(1.3,-0.5), frame = "n", cex = 1.5, font = 2, col="red")
-  tiplabels(taxo$tip.label, adj = c(-2,0.3), frame = "n", cex = 1.5, font = 2, col="green")
-  tiplabels(world$tip.label[tip2], tipToChange, adj=0, bg = "lightblue")
+  tiplabels(world$tip.label[tip2], tipToChange, adj=0, bg = "lightblue", font = 2, cex = 1.2)
   
   phylo = drop.tip(world, tip2) # Enlever une feuille
-  tipToChange = which(phylo$tip.label==world$tip.label[tip1])
+  tipToChange = match(world$tip.label[tip1], phylo$tip.label)
+  phylo = makeNodeLabel(phylo, method = "number", prefix = "phy")
   phylo$tip.label[tipToChange] = world$tip.label[tip2] # Changer le nom de la feuille qui est "déplacée"
-  plot(phylo, main = "Phylo", cex = 1.2)
+  plot(phylo, main = "Phylo", cex = 1.2, font = 2)
   nodelabels(phylo$node.label, adj = c(1.3,-0.5), frame = "n", cex = 1.5, font = 2, col="red")
-  tiplabels(phylo$tip.label, adj = c(-2,0.3), frame = "n", cex = 1.5, font = 2, col="green")
-  tiplabels(world$tip.label[tip2], tipToChange, adj=0, bg = "orchid")
+  tiplabels(world$tip.label[tip2], tipToChange, adj=0, bg = "orchid", font = 2, cex = 1.2)
+  
+
   
   return(list(taxo = taxo, phylo = phylo, world = world))
 }
@@ -92,12 +92,11 @@ treeMetrics <- function (T1, T2){
 }
 
 # Création des arbres à tester 
-x = createTaxPhy(15)
+x = createTaxPhy(nbLeaves = 20, nb.move = 4)
 
 T1 = x$taxo
 T2 = x$phylo
-subT1 = T1
-subT2 = T2
+
 
 # Mast en cas d'étages différents
 maststep <- function(subrootT1, subrootT2, T1, T2){ #On garde les arbres d'origine
@@ -106,7 +105,7 @@ maststep <- function(subrootT1, subrootT2, T1, T2){ #On garde les arbres d'origi
     mastlist = list(c(),c(),c()) # liste de stockage
   
     # Utiliser les subroot pour faire des sous arbres si la racine est différente
-    # print(paste0("SBRT 1 :", subrootT1," depuis ", T1$Nnode, " noeuds", ";  SBRT 2 : ", subrootT2, " depuis ", T2$Nnode, " noeuds")) 
+    print(paste0("SBRT 1 :", subrootT1," depuis ", T1$Nnode, " noeuds", ";  SBRT 2 : ", subrootT2, " depuis ", T2$Nnode, " noeuds")) 
     
     if (subrootT1 != T1$node.label[1]){
       subT1 = extract.clade(T1, subrootT1)
@@ -126,18 +125,19 @@ maststep <- function(subrootT1, subrootT2, T1, T2){ #On garde les arbres d'origi
     # Conditions de raccourci
     ## Arrêter s'il n'y a aucune feuille en commun
     commonLeaves = (subTmetrics$leavesT1 %in% subTmetrics$leavesT2)
-    overlap = sum(overlap, na.rm=T)
+    overlap = sum(commonLeaves, na.rm=T)
     if (overlap == 0){
-      #print(paste0("NOMATCH SBRT 1 :", subrootT1," depuis ", T1$Nnode, " noeuds", ";  SBRT 2 : ", subrootT2, " depuis ", T2$Nnode, " noeuds")) 
+      print(paste0("NOMATCH SBRT 1 :", subrootT1," depuis ", T1$Nnode, " noeuds", ";  SBRT 2 : ", subrootT2, " depuis ", T2$Nnode, " noeuds")) 
       return ("")
     }
     ## Si il y a un overlap de 1, retourner la feuille en commun
     else if (overlap == 1){
-      return (which(commonLeaves))
+      return (subTmetrics$leavesT1[which(commonLeaves)])
     }
     ## Si il y a un overlap de 1, retourner la feuille en commun
     else if (overlap == 2 & length(commonLeaves)>= 2){
-      return (paste0(which(commonLeaves), collapse ="" ))
+      return (paste0(subTmetrics$leavesT1[which(commonLeaves)]
+                     , collapse ="" ))
     }
     
     # Tableaux des paths du noeud en cours 
@@ -148,7 +148,7 @@ maststep <- function(subrootT1, subrootT2, T1, T2){ #On garde les arbres d'origi
   
   # Boucle T1 sur sous-arbre de T2 ####
     # Si premier noeud de l'arbre, séparer les résultats des sous arbres
-    #print("1 : ")
+    print("1 : ")
     if (subTmetrics$rootT2 == "n1"){
       for (firstnode in currentT2Node[,2]){
         if (firstnode %in% subTmetrics$leavesT2) {  # si le sous-noeud est une feuille
@@ -157,11 +157,11 @@ maststep <- function(subrootT1, subrootT2, T1, T2){ #On garde les arbres d'origi
           }
         }
         else{
-          #print(paste0("entrée mastep 1; premier noeud ", firstnode, " de ", T2$Nnode, " noeuds dans ", T1$Nnode, " noeuds "))
+          print(paste0("entrée mastep 1; premier noeud ", firstnode, " de ", T2$Nnode, " noeuds dans ", T1$Nnode, " noeuds "))
           
           mastlist[[1]] = append(mastlist[[1]], maststep(subrootT1, firstnode, T1, T2))
           
-          #print(paste0("sortie mastep 1; premier noeud ", firstnode, " de ", T2$Nnode, " noeuds dans ", T1$Nnode, " noeuds "))
+          print(paste0("sortie mastep 1; premier noeud ", firstnode, " de ", T2$Nnode, " noeuds dans ", T1$Nnode, " noeuds "))
         }
       }
     }
@@ -169,30 +169,30 @@ maststep <- function(subrootT1, subrootT2, T1, T2){ #On garde les arbres d'origi
     # Si on est dans un des sous arbre, faire le maststep récursivement
     else { 
      for (subnodeT2 in currentT2Node[,2]){ # i = sous-noeuds du noeud en cours
-       #print(paste0("1 : Sous-noeud en cours ", subnodeT2, " de ", T2$Nnode," noeuds dans ", subrootT1))
+       print(paste0("1 : Sous-noeud en cours ", subnodeT2, " de ", T2$Nnode," noeuds dans ", subrootT1))
       
       if (subnodeT2 %in% subTmetrics$leavesT2) {  # si le sous-noeud est une feuille
         if (subnodeT2 %in% subTmetrics$leavesT1){ # si cette feuille appartient à l'autre sous-arbre
           mastlist[[1]] = append(mastlist[[1]], subnodeT2)
-          #print(paste0("1 : Mastlist in ", (paste0(mastlist[[1]], collapse = " "))))
+          print(paste0("1 : Mastlist in ", (paste0(mastlist[[1]], collapse = " "))))
           }
       } else {
         # Ajoute la mastlist des enfants a celle du noeud en cours
-        #print(paste0("ENTREE mastep 1; sous noeud ", subnodeT2, " de ", T2$Nnode, " noeuds dans ", subrootT1))
+        print(paste0("ENTREE mastep 1; sous noeud ", subnodeT2, " de ", T2$Nnode, " noeuds dans ", subrootT1))
         
         mastlist[[1]] = append(mastlist[[1]], maststep(subrootT1, subnodeT2, T1, T2))
         
-        #print(paste0("SORTIE mastep 1; sous noeud ", subnodeT2, " de ", T2$Nnode, " noeuds dans ", subrootT1))
+        print(paste0("SORTIE mastep 1; sous noeud ", subnodeT2, " de ", T2$Nnode, " noeuds dans ", subrootT1))
       }
      }
       # Concaténer les feuilles
       mastlist[[1]] = paste0(mastlist[[1]], collapse = "")
     }
   
-  #print(paste0("1 : Mastlist end ", (paste0(mastlist[[1]], collapse = " "))))
+  print(paste0("1 : Mastlist end ", (paste0(mastlist[[1]], collapse = " "))))
   
   # Boucle T2 sur sous-arbre de T1 ####
-  #print("2 : ")
+  print("2 : ")
     # Si premier noeud de l'arbre, séparer les résultats des sous arbres
     if (subTmetrics$rootT1 == "n1"){
       for (firstnode in currentT1Node[,2]){
@@ -202,10 +202,10 @@ maststep <- function(subrootT1, subrootT2, T1, T2){ #On garde les arbres d'origi
           }
         }
         else {
-          #print(paste0("ENTREE mastep 2; premier noeud ", firstnode, " de ", T1$Nnode, " noeuds dans ", T2$Nnode, " noeuds "))
+          print(paste0("ENTREE mastep 2; premier noeud ", firstnode, " de ", T1$Nnode, " noeuds dans ", T2$Nnode, " noeuds "))
           
           mastlist[[2]] = append(mastlist[[2]], maststep(subrootT2, firstnode, T2, T1))
-          #print(paste0("SORTIE mastep 2; premier noeud ", firstnode, " de ", T1$Nnode, " noeuds dans ", T2$Nnode, " noeuds "))
+          print(paste0("SORTIE mastep 2; premier noeud ", firstnode, " de ", T1$Nnode, " noeuds dans ", T2$Nnode, " noeuds "))
         }
       }
     }
@@ -213,27 +213,27 @@ maststep <- function(subrootT1, subrootT2, T1, T2){ #On garde les arbres d'origi
     # Si on est dans un des sous arbre, faire le maststep récursivement
     else { 
       for (subnodeT1 in currentT1Node[,2]){
-        #print(paste0("2 : Sous-noeud en cours ", subnodeT1, " de ", T1$Nnode," noeuds dans ", subrootT2))
+        print(paste0("2 : Sous-noeud en cours ", subnodeT1, " de ", T1$Nnode," noeuds dans ", subrootT2))
         
         if (subnodeT1 %in% subTmetrics$leavesT1) {  # si le sous-noeud est une feuille
           if (subnodeT1 %in% subTmetrics$leavesT2){ # si cette feuille appartient à l'autre sous-arbre
             mastlist[[2]] = append(mastlist[[2]], subnodeT1)
-            #print(paste0("2 : Mastlist in ", (paste0(mastlist[[2]], collapse = " "))))
+            print(paste0("2 : Mastlist in ", (paste0(mastlist[[2]], collapse = " "))))
           }
         } else {
           # Ajoute la mastlist des enfants a celle du noeud en cours
-          #print(paste0("ENTREE mastep 2; sous noeud ", subnodeT1, " de ", T1$Nnode, " noeuds dans ", subrootT2))
+          print(paste0("ENTREE mastep 2; sous noeud ", subnodeT1, " de ", T1$Nnode, " noeuds dans ", subrootT2))
           mastlist[[2]] = append(mastlist[[2]], maststep(subrootT2, subnodeT1, T2, T1))
-          #print(paste0("SORTIE mastep 2; sous noeud ", subnodeT1, " de ", T1$Nnode, " noeuds dans ", subrootT2))
+          print(paste0("SORTIE mastep 2; sous noeud ", subnodeT1, " de ", T1$Nnode, " noeuds dans ", subrootT2))
         }
       }
       # Concaténer les feuilles
       mastlist[[2]] = paste0(mastlist[[2]], collapse = "")
     }
-  #print(paste0("2 : Mastlist end ", (paste0(mastlist[[2]], collapse = " "))))
+  print(paste0("2 : Mastlist end ", (paste0(mastlist[[2]], collapse = " "))))
   
   # Matching des sous-arbres ####
-  #print("3 : ")
+  print("3 : ")
     # Matrice des produits cartésiens avec sous-noeuds de T2 en colonne et de T1 en ligne
     associations = matrix(nrow = nrow(currentT1Node), ncol = nrow(currentT2Node), 
                           dimnames = list(c(paste0("T1",currentT1Node[,2])),
@@ -244,7 +244,7 @@ maststep <- function(subrootT1, subrootT2, T1, T2){ #On garde les arbres d'origi
       for (j in 1:nrow(currentT2Node)){
         iNode = currentT1Node[i,2]
         jNode = currentT2Node[j,2]
-        #print (paste0("i : ", iNode, "; j : ", jNode))
+        print (paste0("i : ", iNode, "; j : ", jNode))
         
         # Si l'un des noeuds courant est une feuille
         if ((iNode %in% subTmetrics$leavesT1) && 
@@ -274,21 +274,21 @@ maststep <- function(subrootT1, subrootT2, T1, T2){ #On garde les arbres d'origi
             countMat[i,j] = 0
           }
         } else {
-          #print(paste0("SORTIE mastep 3; sous noeuds ", iNode, " et ", jNode))
+          print(paste0("SORTIE mastep 3; sous noeuds ", iNode, " et ", jNode))
           associations[i,j] = maststep(subrootT1 = iNode, 
                                        subrootT2 = jNode, 
                                        T1, T2)
-          #print(paste0("SORTIE mastep 3; sous noeuds ", iNode, " et ", jNode))
+          print(paste0("SORTIE mastep 3; sous noeuds ", iNode, " et ", jNode))
           countMat[i,j] = str_count(associations[i,j], pattern = "t")
         }
-        #print(countMat[i,j])
+        print(countMat[i,j])
       }  
     }
     
     # Inverser la countMat pour résoudre maximisation avec Algo Hongrois 
     countMat = abs(countMat - max(countMat))
-    #print("countMatrix :")
-    #print(countMat)
+    print("countMatrix :")
+    print(countMat)
     bestmatches = HungarianSolver(countMat)$pairs
     
     # Retire les matchs sans optimum dans une matrice rectangle
@@ -300,25 +300,25 @@ maststep <- function(subrootT1, subrootT2, T1, T2){ #On garde les arbres d'origi
       mastlist[[3]] = append(mastlist[[3]], associations[bestmatches[i,1], bestmatches[i,2]])
     }
     mastlist[[3]] = paste0(mastlist[[3]], collapse="")
-    #print(paste0("3 : Mastlist end ", (paste0(mastlist[[3]], collapse = " "))))
+    print(paste0("3 : Mastlist end ", (paste0(mastlist[[3]], collapse = " "))))
     
   # Choisir le max de la mastlist ####
     besthit = c()
     for (i in 1:length(mastlist)){
-      #print(paste0("Mastlist : ",i, " ", (paste0(mastlist[[i]], collapse = " "))))
+      print(paste0("Mastlist : ",i, " ", (paste0(mastlist[[i]], collapse = " "))))
       
       besthit = append(besthit, 
                        mastlist[[i]][which.max(lapply(mastlist[[i]], str_count, pattern = "t"))])
     }
     
-   # print(paste0("besthits :",besthit))
+    print(paste0("besthits :",besthit))
     print(besthit[which.max(lapply(besthit, str_count, pattern = "t"))])
     return (besthit[which.max(lapply(besthit, str_count, pattern = "t"))])
 }
 
 resultat = maststep(subrootT1 = T1$node.label[1], subrootT2 = T2$node.label[1],
      T1 = T1, T2 = T2)
-z = keep.tip(T1, c("t10","t6","t4","t8"))
+y = keep.tip(T2, c("t10","t7","t3"))
 
 
 mastunion <- function(subT1, subT2){
