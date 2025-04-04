@@ -97,7 +97,7 @@ treeMetrics <- function (taxo, phylo){
 }
 
 # Création des arbres à tester 
-x = createTaxPhy(nbLeaves = 5, nb.move = 1)
+x = createTaxPhy(nbLeaves = 7, nb.move = 1)
 
 Taxo = x$taxo
 Phylo = x$phylo
@@ -204,7 +204,7 @@ maststep <- function(subRootTax, subRootPhy, trees){ #On garde les arbres d'orig
       }
      }
       # Concaténer les feuilles
-      mastlist[[1]] = paste0(mastlist[[1]], collapse = "")
+      #mastlist[[1]] = paste0(mastlist[[1]], collapse = "")
    }
   
   print(paste0("1 : Mastlist end ", (paste0(mastlist[[1]], collapse = " "))))
@@ -251,7 +251,7 @@ maststep <- function(subRootTax, subRootPhy, trees){ #On garde les arbres d'orig
         }
       }
       # Concaténer les feuilles
-      mastlist[[2]] = paste0(mastlist[[2]], collapse = "")
+      #mastlist[[2]] = paste0(mastlist[[2]], collapse = "")
     }
   #print(paste0("2 : Mastlist end ", (paste0(mastlist[[2]], collapse = " "))))
   
