@@ -5,12 +5,14 @@ library(RcppHungarian)
 # Fonction pour faire la phylo et la taxo.
 # Retourne un vecteur avec taxo, phylo, arbre d'origine
 createTaxPhy <- function(nbLeaves = 5, nb.move = 1){
-  world = rtree(nbLeaves, rooted = FALSE)
+  world = rtree(nbLeaves+nb.move, rooted = FALSE)
   (q1 = summary(world$edge.length)[2])
   ttt = sample(1:length(world$tip.label), size = 2*nb.move, replace = F)
   tip1 = ttt[1:nb.move]
   tip2 = ttt[(nb.move+1):(nb.move*2)]
   
+  tipsNumber = sub(".", "", world$tip.label)
+  wrongTips = world$tip.label[tip2]
   
   # Dichotomie vers polytomie ####
   #' [Dichotomie vers polytomie]
@@ -26,22 +28,22 @@ createTaxPhy <- function(nbLeaves = 5, nb.move = 1){
   plot(world, cex = 1.5, main = "World", font = 2)
   nodelabels(world$node.label, adj = c(1.3,-0.5), frame = "n", cex = 1.5, font = 2, col="red")
   tiplabels(world$tip.label[tip1], tip1, adj=0, font = 2, cex = 1.2, bg = "mediumpurple1")
-  tiplabels(world$tip.label[tip2], tip2, adj=0, bg = "lightblue", font = 2, cex = 1.2)
+  tiplabels(wrongTips, tip2, adj=0, bg = "lightblue", font = 2, cex = 1.2)
   
   taxo = drop.tip(world, tip1) # Enlever une feuille
-  tipToChange = match(world$tip.label[tip2], taxo$tip.label)
+  tipToChange = match(wrongTips, taxo$tip.label)
   taxo = makeNodeLabel(taxo, method = "number", prefix = "tax")
   plot(taxo, main = "Taxo", cex = 1.2, font = 2)
   nodelabels(taxo$node.label, adj = c(1.3,-0.5), frame = "n", cex = 1.5, font = 2, col="red")
-  tiplabels(world$tip.label[tip2], tipToChange, adj=0, bg = "lightblue", font = 2, cex = 1.2)
+  tiplabels(wrongTips, tipToChange, adj=0, bg = "lightblue", font = 2, cex = 1.2)
   
   phylo = drop.tip(world, tip2) # Enlever une feuille
   tipToChange = match(world$tip.label[tip1], phylo$tip.label)
   phylo = makeNodeLabel(phylo, method = "number", prefix = "phy")
-  phylo$tip.label[tipToChange] = world$tip.label[tip2] # Changer le nom de la feuille qui est "déplacée"
+  phylo$tip.label[tipToChange] = wrongTips # Changer le nom de la feuille qui est "déplacée"
   plot(phylo, main = "Phylo", cex = 1.2, font = 2)
   nodelabels(phylo$node.label, adj = c(1.3,-0.5), frame = "n", cex = 1.5, font = 2, col="red")
-  tiplabels(world$tip.label[tip2], tipToChange, adj=0, bg = "orchid", font = 2, cex = 1.2)
+  tiplabels(wrongTips, tipToChange, adj=0, bg = "orchid", font = 2, cex = 1.2)
   
   
   taxo[[6]] = "taxo"
@@ -50,254 +52,285 @@ createTaxPhy <- function(nbLeaves = 5, nb.move = 1){
   phylo[[6]] = "phylo"
   names(phylo)[6] = "name"
   
-  return(list(taxo = taxo, phylo = phylo, world = world))
+  return(list(taxo = taxo, phylo = phylo, world = world, 
+              wrongTips = tipsNumber[tip2], truth = tipsNumber[-c(tip2,tip1)]))
 }
 
-# Fonction pour faire une dataframe avec le nom des feuilles
+# Fonction pour faire une dataframe avec le nom des feuilles et noeuds
 edgesToDf <- function(tree){
+  nbNodesLeaves = (length(tree$tip.label)+Nnode(tree))
   
-  nbNodes = (length(tree$tip.label)+Nnode(tree))
+  # Concaténer noms des feuilles et noeuds
   newLabels = c(tree$tip.label, tree$node.label)
   
+  # Remplacer nombres du path par les noms des noeuds et feuilles
   edgePaths = as.data.frame(tree$edge)
   edgePaths = edgePaths %>%
     rename("from"="V1","to"="V2") %>%
-    mutate(from = recode(from, !!!setNames(newLabels, as.character(1:nbNodes)))) %>%
-    mutate(to = recode(to, !!!setNames(newLabels, as.character(1:nbNodes))))
+    mutate(from = recode(from, !!!setNames(newLabels, as.character(1:nbNodesLeaves)))) %>%
+    mutate(to = recode(to, !!!setNames(newLabels, as.character(1:nbNodesLeaves))))
   
   return(edgePaths)
 }
 
 # Métriques et repères sur l'arbre
 treeMetrics <- function (taxo, phylo){
-  nbTaxoLeaves = length(taxo$tip.label)
-  leavesTaxo = taxo$tip.label # liste des noms des feuilles
-  rootTaxo = taxo$node.label[1]
-  edgeTaxo = edgesToDf(taxo)
-  nbTaxoNodes = taxo$Nnode
-  
-  nbPhyloLeaves = length(phylo$tip.label)
-  leavesPhylo = phylo$tip.label
-  rootPhylo = phylo$node.label[1]
-  edgePhylo = edgesToDf(phylo)
-  nbPhyloNodes = phylo$Nnode
-  
-  metrics = list(nbTaxoLeaves = nbTaxoLeaves,
-                 nbTaxoNodes = nbTaxoNodes,
-                 leavesTaxo= leavesTaxo,
-                 rootTaxo = rootTaxo,
-                 edgeTaxo = edgeTaxo,
-                 nbPhyloLeaves = nbPhyloLeaves,
-                 nbPhyloNodes = nbPhyloNodes,
-                 leavesPhylo = leavesPhylo,
-                 rootPhylo = rootPhylo,
-                 edgePhylo = edgePhylo)
+
+    metrics = list(nbTaxoLeaves = length(taxo$tip.label),
+                 nbTaxoNodes = taxo$Nnode,
+                 leavesTaxo= taxo$tip.label,
+                 rootTaxo = taxo$node.label[1],
+                 edgeTaxo = edgesToDf(taxo),
+                 nbPhyloLeaves = length(phylo$tip.label),
+                 nbPhyloNodes = phylo$Nnode,
+                 leavesPhylo = phylo$tip.label,
+                 rootPhylo = phylo$node.label[1],
+                 edgePhylo = edgesToDf(phylo))
   
   return(metrics)
 }
 
-# Création des arbres à tester 
-x = createTaxPhy(nbLeaves = 50, nb.move = 5)
-
-Taxo = x$taxo
-Phylo = x$phylo
-zeMatrix = matrix(nrow = Taxo$Nnode, 
-                  ncol = Phylo$Nnode, 
-                  dimnames = list(Taxo$node.label, Phylo$node.label))
-
-# Mast en cas d'étages différents
-maststep <- function(subRootTax, subRootPhy, trees){ #On garde les arbres d'origine
+# Maximum agreement subtree
+mast <- function(subRootTax, subRootPhy, trees){ #On garde les arbres d'origine
   # Initialisation des variables ####
   
-    mastlist = list(c(),c(),c()) # liste de stockage
-    
-    whichTaxo = which(c(trees[[1]]$name, trees[[2]]$name)=="taxo")
-    taxo = trees[[whichTaxo]]
-    phylo = trees[[base::setdiff(1:2,whichTaxo)]]
-    
-    # Utiliser les subroot pour faire des sous arbres si la racine est différente
-    print(paste0("SBRT 1 :", subRootTax," depuis Taxo", ";  SBRT 2 : ", subRootPhy, " depuis Phylo")) 
-    
-    if (subRootTax != taxo$node.label[1]){
-      subTax = extract.clade(taxo, subRootTax)
-    }
-    else { subTax = taxo
-    }
-    
-    if (subRootPhy != phylo$node.label[1]){
-      subPhy = extract.clade(phylo, subRootPhy)
-    }
-    else { subPhy = phylo
-    }
-    
-    # Calculer des métriques sur les sous arbres
-    subTmetrics = treeMetrics(taxo = subTax, phylo = subPhy)
-    
-    # Conditions de raccourci
-    ## Arrêter s'il n'y a aucune feuille en commun
-    commonLeaves = (subTmetrics$leavesTaxo %in% subTmetrics$leavesPhylo)
-    overlap = sum(commonLeaves, na.rm=T)
-    if (overlap == 0){
-      print(paste0("NOMATCH SBRT 1 :", subRootTax," depuis Taxo", ";  SBRT 2 : ", subRootPhy, " depuis Phylo")) 
-      return ("")
-    }
-    ## Si il y a un overlap de 1, retourner la feuille en commun
-    else if (overlap == 1){
-      return (subTmetrics$leavesTaxo[which(commonLeaves)])
-    }
-    ## Si il y a un overlap de 1, retourner la feuille en commun
-    else if (overlap == 2 & length(commonLeaves)>= 2){
-      return (paste0(subTmetrics$leavesTaxo[which(commonLeaves)], collapse ="" ))
-    }
-    
-    # Tableaux des paths du noeud en cours 
-    currentTaxoNode = filter(subTmetrics$edgeTaxo, from == subTmetrics$rootTaxo) %>%
-                      arrange(to)
-    currentPhyloNode = filter(subTmetrics$edgePhylo, from == subTmetrics$rootPhylo) %>%
-                      arrange(to)
+  mastlist = list(c(),c(),c()) # liste de stockage
+  
+  whichTaxo = which(c(trees[[1]]$name, trees[[2]]$name)=="taxo")
+  taxo = trees[[whichTaxo]]
+  phylo = trees[[base::setdiff(1:2,whichTaxo)]]
+  
+  # Utiliser les subroot pour faire des sous arbres si la racine est différente
+  print(paste0("SBRT 1 :", subRootTax," depuis Taxo", ";  SBRT 2 : ", subRootPhy, " depuis Phylo")) 
+  
+  if (subRootTax != taxo$node.label[1]){
+    subTax = extract.clade(taxo, subRootTax)
+  }
+  else { subTax = taxo
+  }
+  
+  if (subRootPhy != phylo$node.label[1]){
+    subPhy = extract.clade(phylo, subRootPhy)
+  }
+  else { subPhy = phylo
+  }
+  
+  # Calculer des métriques sur les sous arbres
+  subTmetrics = treeMetrics(taxo = subTax, phylo = subPhy)
+  
+  # Conditions de raccourci
+  ## Arrêter s'il n'y a aucune feuille en commun
+  commonLeaves = (subTmetrics$leavesTaxo %in% subTmetrics$leavesPhylo)
+  overlap = sum(commonLeaves, na.rm=T)
+  if (overlap == 0){
+    print(paste0("NOMATCH SBRT 1 :", subRootTax," depuis Taxo", ";  SBRT 2 : ", subRootPhy, " depuis Phylo")) 
+    return ("")
+  }
+  ## Si il y a un overlap de 1, retourner la feuille en commun
+  else if (overlap == 1){
+    return (subTmetrics$leavesTaxo[which(commonLeaves)])
+  }
+  ## Si il y a un overlap de 1, retourner la feuille en commun
+  else if (overlap == 2 & length(commonLeaves)>= 2){
+    return (paste0(subTmetrics$leavesTaxo[which(commonLeaves)], collapse ="" ))
+  }
+  
+  # Tableaux des paths du noeud en cours 
+  currentTaxoNode = filter(subTmetrics$edgeTaxo, from == subTmetrics$rootTaxo) %>%
+    arrange(to)
+  currentPhyloNode = filter(subTmetrics$edgePhylo, from == subTmetrics$rootPhylo) %>%
+    arrange(to)
   
   # Boucle Taxo sur sous-arbre de Phylo ####
-    print("1 :")
-    # Si on est dans un des sous arbre, faire le maststep récursivement
-     for (subnodePhylo in currentPhyloNode[,2]){ # i = sous-noeuds du noeud en cours
-       print(paste0("1 : Sous-noeud en cours ", subnodePhylo, " de Phylo dans ", subRootTax, " de Taxo"))
-      
-      if (subnodePhylo %in% subTmetrics$leavesPhylo) {  # si le sous-noeud est une feuille
-        if (subnodePhylo %in% subTmetrics$leavesTaxo){ # si cette feuille appartient à l'autre sous-arbre
-          mastlist[[1]] = append(mastlist[[1]], subnodePhylo)
-          print(paste0("1 : Mastlist in ", (paste0(mastlist[[1]], collapse = " "))))
-          }
-      } else {
-        # Ajoute la mastlist des enfants a celle du noeud en cours
-        if (is.na(zeMatrix[subRootTax, subnodePhylo])){
-          print(paste0("ENTREE mastep 1; sous noeud ", subnodePhylo, " de Phylo dans ", subRootTax, " de Taxo"))
-          .GlobalEnv$zeMatrix[subRootTax, subnodePhylo] = maststep(subRootTax, subnodePhylo, list(taxo,phylo))
-          print(paste0("SORTIE mastep 1; sous noeud ", subnodePhylo, " de Phylo dans ", subRootTax, " de Taxo"))
-        }
-        mastlist[[1]] = append(mastlist[[1]], zeMatrix[subRootTax, subnodePhylo])
+  print("1 :")
+  # Si on est dans un des sous arbre, faire le mast récursivement
+  for (subnodePhylo in currentPhyloNode[,2]){ # i = sous-noeuds du noeud en cours
+    print(paste0("1 : Sous-noeud en cours ", subnodePhylo, " de Phylo dans ", subRootTax, " de Taxo"))
+    
+    if (subnodePhylo %in% subTmetrics$leavesPhylo) {  # si le sous-noeud est une feuille
+      if (subnodePhylo %in% subTmetrics$leavesTaxo){ # si cette feuille appartient à l'autre sous-arbre
+        mastlist[[1]] = append(mastlist[[1]], subnodePhylo)
         print(paste0("1 : Mastlist in ", (paste0(mastlist[[1]], collapse = " "))))
       }
-     }
+    } else {
+      # Ajoute la mastlist des enfants a celle du noeud en cours
+      if (is.na(doneMat[subRootTax, subnodePhylo])){
+        print(paste0("ENTREE mastep 1; sous noeud ", subnodePhylo, " de Phylo dans ", subRootTax, " de Taxo"))
+        .GlobalEnv$doneMat[subRootTax, subnodePhylo] = mast(subRootTax, subnodePhylo, list(taxo,phylo))
+        print(paste0("SORTIE mastep 1; sous noeud ", subnodePhylo, " de Phylo dans ", subRootTax, " de Taxo"))
+      }
+      mastlist[[1]] = append(mastlist[[1]], doneMat[subRootTax, subnodePhylo])
+      print(paste0("1 : Mastlist in ", (paste0(mastlist[[1]], collapse = " "))))
+    }
+  }
   
   print(paste0("1 : Mastlist end ", (paste0(mastlist[[1]], collapse = " "))))
   
   # Boucle Phylo sur sous-arbre de Taxo ####
-    print("2 : ")
-    # Si on est dans un des sous arbre, faire le maststep récursivement
-      for (subnodeTaxo in currentTaxoNode[,2]){
-        print(paste0("2 : Sous-noeud en cours ", subnodeTaxo, " de taxo dans ", subRootPhy))
-        
-        if (subnodeTaxo %in% subTmetrics$leavesTaxo) {  # si le sous-noeud est une feuille
-          if (subnodeTaxo %in% subTmetrics$leavesPhylo){ # si cette feuille appartient à l'autre sous-arbre
-            mastlist[[2]] = append(mastlist[[2]], subnodeTaxo)
-            print(paste0("2 : Mastlist in ", (paste0(mastlist[[2]], collapse = " "))))
-          }
-        } else {
-          # Ajoute la mastlist des enfants a celle du noeud en cours
-          if (is.na(zeMatrix[subnodeTaxo, subRootPhy])){
-            print(paste0("ENTREE mastep 2; sous noeud ", subnodeTaxo, " de Taxo dans ", subRootPhy, " de Phylo"))
-            .GlobalEnv$zeMatrix[subnodeTaxo, subRootPhy] = maststep(subnodeTaxo, subRootPhy, list(taxo,phylo))
-            print(paste0("SORTIE mastep 2; sous noeud ", subnodeTaxo, " de Taxo dans ", subRootPhy, " de Phylo"))
-          }
-          mastlist[[2]] = append(mastlist[[2]], zeMatrix[subnodeTaxo, subRootPhy])
-        }
+  print("2 : ")
+  # Si on est dans un des sous arbre, faire le mast récursivement
+  for (subnodeTaxo in currentTaxoNode[,2]){
+    print(paste0("2 : Sous-noeud en cours ", subnodeTaxo, " de taxo dans ", subRootPhy))
+    
+    if (subnodeTaxo %in% subTmetrics$leavesTaxo) {  # si le sous-noeud est une feuille
+      if (subnodeTaxo %in% subTmetrics$leavesPhylo){ # si cette feuille appartient à l'autre sous-arbre
+        mastlist[[2]] = append(mastlist[[2]], subnodeTaxo)
+        print(paste0("2 : Mastlist in ", (paste0(mastlist[[2]], collapse = " "))))
       }
+    } else {
+      # Ajoute la mastlist des enfants a celle du noeud en cours
+      if (is.na(doneMat[subnodeTaxo, subRootPhy])){
+        print(paste0("ENTREE mastep 2; sous noeud ", subnodeTaxo, " de Taxo dans ", subRootPhy, " de Phylo"))
+        .GlobalEnv$doneMat[subnodeTaxo, subRootPhy] = mast(subnodeTaxo, subRootPhy, list(taxo,phylo))
+        print(paste0("SORTIE mastep 2; sous noeud ", subnodeTaxo, " de Taxo dans ", subRootPhy, " de Phylo"))
+      }
+      mastlist[[2]] = append(mastlist[[2]], doneMat[subnodeTaxo, subRootPhy])
+    }
+  }
   print(paste0("2 : Mastlist end ", (paste0(mastlist[[2]], collapse = " "))))
   
   # Matching des sous-arbres ####
   print("3 : ")
-    # Matrice des produits cartésiens avec sous-noeuds de phylo en colonne et de taxo en ligne
-    associations = matrix(nrow = nrow(currentTaxoNode), ncol = nrow(currentPhyloNode), 
-                          dimnames = list(c(paste0("taxo",currentTaxoNode[,2])),
-                                          c(paste0("phylo",currentPhyloNode[,2]))))
-    countMat = associations # matrice compte longueur similarité
-    
-    for (i in 1:nrow(currentTaxoNode)){
-      for (j in 1:nrow(currentPhyloNode)){
-        iNode = currentTaxoNode[i,2]
-        jNode = currentPhyloNode[j,2]
-        print (paste0("i : ", iNode, "; j : ", jNode))
-        
-        # Si l'un des noeuds courant est une feuille
-        if ((iNode %in% subTmetrics$leavesTaxo) && 
-            (jNode %in% subTmetrics$leavesPhylo)){
-          if (iNode==jNode){ # sont elles identiques ?
-            associations[i,j] = iNode 
-            countMat[i,j] = 1
-          } else {
-            associations[i,j] = NA 
-            countMat[i,j] = 0 
-          }
-        } else if ((iNode %in% subTmetrics$leavesTaxo) || 
-                 (jNode %in% subTmetrics$leavesPhylo)){
-          # Sinon la feuille est-elle dans l'autre sous-arbre ?
-          if ((iNode %in% subTmetrics$leavesTaxo) &&
-                     (iNode %in% extract.clade(phylo, jNode)$tip.label)){
-            associations[i,j] = iNode 
-            countMat[i,j] = 1
-            
-          } else if ((jNode %in% subTmetrics$leavesPhylo) &&
-                     (jNode %in% extract.clade(taxo, iNode)$tip.label)){
-            associations[i,j] = jNode 
-            countMat[i,j] = 1
-          
-          } else {
-            associations[i,j] = NA 
-            countMat[i,j] = 0
-          }
-        } else {
-          print(paste0("SORTIE mastep 3; sous noeuds ", iNode, " et ", jNode))
-          associations[i,j] = maststep(subRootTax = iNode, 
-                                       subRootPhy = jNode, 
-                                       list(taxo, phylo))
-          print(paste0("SORTIE mastep 3; sous noeuds ", iNode, " et ", jNode))
-          countMat[i,j] = str_count(associations[i,j], pattern = "t")
-        }
-        print(countMat[i,j])
-      }  
-    }
-    
-    # Inverser la countMat pour résoudre maximisation avec Algo Hongrois 
-    countMat = abs(countMat - max(countMat))
-    print("countMatrix :")
-    print(countMat)
-    bestmatches = HungarianSolver(countMat)$pairs
-    
-    # Retire les matchs sans optimum dans une matrice rectangle
-    if (!(identical(which(bestmatches[,2]==0), integer(0)))) # Vérifie que le which n'es pas vide
-      bestmatches = bestmatches[-which(bestmatches[,2]==0),] 
-    
-    # Concaténation du meilleur groupe d'associations
-    for (i in 1:nrow(bestmatches)){
-      mastlist[[3]] = append(mastlist[[3]], associations[bestmatches[i,1], bestmatches[i,2]])
-    }
-    mastlist[[3]] = paste0(mastlist[[3]], collapse="")
-    print(paste0("3 : Mastlist end ", (paste0(mastlist[[3]], collapse = " "))))
-    
-  # Choisir le max de la mastlist ####
-    besthit = c()
-    for (i in 1:length(mastlist)){
-      print(paste0("Mastlist : ",i, " ", (paste0(mastlist[[i]], collapse = " "))))
+  # Matrice des produits cartésiens avec sous-noeuds de phylo en colonne et de taxo en ligne
+  associations = matrix(nrow = nrow(currentTaxoNode), ncol = nrow(currentPhyloNode), 
+                        dimnames = list(c(paste0("taxo",currentTaxoNode[,2])),
+                                        c(paste0("phylo",currentPhyloNode[,2]))))
+  countMat = associations # matrice compte longueur similarité
+  
+  for (i in 1:nrow(currentTaxoNode)){
+    for (j in 1:nrow(currentPhyloNode)){
+      iNode = currentTaxoNode[i,2]
+      jNode = currentPhyloNode[j,2]
+      print (paste0("i : ", iNode, "; j : ", jNode))
       
-      besthit = append(besthit, 
-                       mastlist[[i]][which.max(lapply(mastlist[[i]], str_count, pattern = "t"))])
-    }
+      # Si l'un des noeuds courant est une feuille
+      if ((iNode %in% subTmetrics$leavesTaxo) && 
+          (jNode %in% subTmetrics$leavesPhylo)){
+        if (iNode==jNode){ # sont elles identiques ?
+          associations[i,j] = iNode 
+          countMat[i,j] = 1
+        } else {
+          associations[i,j] = NA 
+          countMat[i,j] = 0 
+        }
+      } else if ((iNode %in% subTmetrics$leavesTaxo) || 
+                 (jNode %in% subTmetrics$leavesPhylo)){
+        # Sinon la feuille est-elle dans l'autre sous-arbre ?
+        if ((iNode %in% subTmetrics$leavesTaxo) &&
+            (iNode %in% extract.clade(phylo, jNode)$tip.label)){
+          associations[i,j] = iNode 
+          countMat[i,j] = 1
+          
+        } else if ((jNode %in% subTmetrics$leavesPhylo) &&
+                   (jNode %in% extract.clade(taxo, iNode)$tip.label)){
+          associations[i,j] = jNode 
+          countMat[i,j] = 1
+          
+        } else {
+          associations[i,j] = NA 
+          countMat[i,j] = 0
+        }
+      } else {
+        print(paste0("SORTIE mastep 3; sous noeuds ", iNode, " et ", jNode))
+        associations[i,j] = mast(subRootTax = iNode, 
+                                     subRootPhy = jNode, 
+                                     list(taxo, phylo))
+        print(paste0("SORTIE mastep 3; sous noeuds ", iNode, " et ", jNode))
+        countMat[i,j] = str_count(associations[i,j], pattern = "t")
+      }
+      print(countMat[i,j])
+    }  
+  }
+  
+  # Inverser la countMat pour résoudre maximisation avec Algo Hongrois 
+  countMat = abs(countMat - max(countMat))
+  print("countMatrix :")
+  print(countMat)
+  bestmatches = HungarianSolver(countMat)$pairs
+  
+  # Retire les matchs sans optimum dans une matrice rectangle
+  if (!(identical(which(bestmatches[,2]==0), integer(0)))) # Vérifie que le which n'es pas vide
+    bestmatches = bestmatches[-which(bestmatches[,2]==0),] 
+  
+  # Concaténation du meilleur groupe d'associations
+  for (i in 1:nrow(bestmatches)){
+    mastlist[[3]] = append(mastlist[[3]], associations[bestmatches[i,1], bestmatches[i,2]])
+  }
+  mastlist[[3]] = gsub("NA", "", paste0(mastlist[[3]], collapse="")) 
+  print(paste0("3 : Mastlist end ", (paste0(mastlist[[3]], collapse = " "))))
+  
+  # Choisir le max de la mastlist ####
+  besthit = c()
+  for (i in 1:length(mastlist)){
+    print(paste0("Mastlist : ",i, " ", (paste0(mastlist[[i]], collapse = " "))))
     
-    print(paste0("besthits :",besthit))
-    print(besthit[which.max(lapply(besthit, str_count, pattern = "t"))])
-    return (besthit[which.max(lapply(besthit, str_count, pattern = "t"))])
+    besthit = append(besthit, 
+                     mastlist[[i]][which.max(lapply(mastlist[[i]], str_count, pattern = "t"))])
+  }
+  
+  print(paste0("besthits :",besthit))
+  print(besthit[which.max(lapply(besthit, str_count, pattern = "t"))])
+  return (besthit[which.max(lapply(besthit, str_count, pattern = "t"))])
 }
 
-zeMatrix = matrix(nrow = Taxo$Nnode, 
-                  ncol = Phylo$Nnode, 
-                  dimnames = list(Taxo$node.label, Phylo$node.label))
+# Benchmark sur des arbres aléatoires
+benchmark <- function(nbRepeats, nbLeaves, nb.move){
+  
+  metrics = list(allPrecision = c(),
+                 allRecall = c(),
+                 allAccuracy = c(),
+                 nbRepeats = nbRepeats,
+                 nbLeaves = nbLeaves,
+                 nb.move = nb.move) 
+  
+  for (rep in 1:nbRepeats){
+    random = createTaxPhy(nbLeaves = 50, nb.move = 5)
+    
+    Taxo = random$taxo
+    Phylo = random$phylo
+    doneMat = matrix(nrow = Taxo$Nnode, 
+                      ncol = Phylo$Nnode, 
+                      dimnames = list(Taxo$node.label, Phylo$node.label))
+    
+    # Résultat du mast sous forme de vecteur avec numéro des feuilles
+    resultat = strsplit(mast(subRootTax = Taxo$node.label[1], 
+                             subRootPhy = Phylo$node.label[1],
+                             trees = list(Taxo,Phylo)),"t")[[1]][-1]
+    
+    # Calcul des métriques
+    TP = length(na.omit(match(resultat, random$truth)))
+    precision = TP / length(resultat)
+    recall = TP / length(random$truth)
+    accuracy = TP + length(setdiff(random$wrongTips, resultat)) / 
+      length(c(random$truth, random$wrongTips))
 
-resultat = maststep(subRootTax = Taxo$node.label[1], subRootPhy = Phylo$node.label[1],
-     trees = list(Taxo,Phylo))
+    metrics$allPrecision = append(metrics$allPrecision, precision)
+    metrics$allRecall = append(metrics$allRecall, recall)
+    metrics$allAcccuracy = append(metrics$allAccuracy, accuracy)
+    
+  }
+  
+  metrics$avgPrecision = mean(metrics$allPrecision)
+  metrics$avgRecall = mean(metrics$allRecall)
+  metrics$avgAcccuracy = mean(metrics$allAccuracy)
+  
+  print(summary(metrics))
+  
+  return (metrics)
+}
 
-y = keep.tip(T2, c("t10","t7","t3"))
+# Lancement manuel d'une instance ####
+random = createTaxPhy(nbLeaves = 5, nb.move = 1)
 
-t30t6t36t44t24t15t31t4t40t20t19t32t29t43t34t25t33t35t47t12t49t42t17t14t7t21t23t38t27t41t48t2t16t50t1t11t26t3t13t46
+Taxo = random$taxo
+Phylo = random$phylo
+doneMat = matrix(nrow = Taxo$Nnode, 
+                 ncol = Phylo$Nnode, 
+                 dimnames = list(Taxo$node.label, Phylo$node.label))
+
+resultat = mast(subRootTax = Taxo$node.label[1], subRootPhy = Phylo$node.label[1],
+                trees = list(Taxo,Phylo))
+
 # test zone ####
 test <- function (a,b){
   if (a==b) {
