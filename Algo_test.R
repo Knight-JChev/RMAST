@@ -294,19 +294,28 @@ mast <- function(subRootTax, subRootPhy, trees){ #On garde les arbres d'origine
 # Benchmark sur des arbres aléatoires
 benchmark <- function(nbRepeats, nbLeaves, nb.move){
   
+  # Dossiers et fichiers de stockage
+  dirNameFig = paste0("Benchmark_data/", format(Sys.time(), "%H%M"), "_Figures_", nbRepeats,"rep")
+  fileName = paste0(format(Sys.time(), "%H%M"),"_",nbRepeats,"rep_",nbLeaves,"leaves_",nb.move,"moves")
+  
+  ifelse(!dir.exists(file.path(dirNameFig)), dir.create(file.path(dirNameFig)), "Figure Directory already exists")
+
   # Variable de stockage des résultats
   metrics = data.frame() 
+  
   
   # Boucle pour atteindre le nombre de répétitions
   print(paste0("Tree 1 / ",nbRepeats, " ongoing"))
   for (rep in 1:nbRepeats){
     
-    # Création des arbres aléatoires avec feuilles déplacées
+    # Création + sauvegarde des arbres aléatoires avec feuilles déplacées
+    png(filename = paste0(dirNameFig,"/",fileName,"_",rep), width = 1920, height = 1080)
     random = createTaxPhy(nbLeaves = nbLeaves, nb.move = nb.move)
+    dev.off()
     
     Taxo = random$taxo
     Phylo = random$phylo
-    
+
     # Matrice d'enregistrement des résultats de mast en cours
     .GlobalEnv$doneMat = matrix(nrow = Taxo$Nnode, 
                       ncol = Phylo$Nnode, 
@@ -326,15 +335,14 @@ benchmark <- function(nbRepeats, nbLeaves, nb.move){
     
     precision = TP / (TP + FP)
     recall = TP / (TP + FN)
-    accuracy = (TP + TN) / 
-      length(c(random$truth, random$realWrongTips))
+    accuracy = (TP + TN) / length(c(random$truth, random$realWrongTips))
     
     # Remplissage d'une table pour l'arbre en cours
-    df = data.frame(nbRepeats = nbRepeats,
-                    nbLeaves = nbLeaves,
-                    nb.move = nb.move,
-                    obsTreeSize = length(resultat),
-                    expErrorSize = length(random$realWrongTips),
+    df = data.frame(nbRepeats = as.factor(nbRepeats),
+                    nbLeaves = as.factor(nbLeaves),
+                    nb.move = as.factor(nb.move),
+                    obsTreeSize = as.factor(length(resultat)),
+                    expErrorSize = as.factor(length(random$realWrongTips)),
                     TP = TP,
                     FP = FP,
                     TN = TN,
@@ -353,15 +361,12 @@ benchmark <- function(nbRepeats, nbLeaves, nb.move){
     print(paste0("Tree  ",rep," / ",nbRepeats, " done"))
   }
   
+  # Sauvegarde des données
+  saveRDS(metrics, file = paste0("Benchmark_data/",fileName,".rds"))
   
-
-  saveRDS(metrics, 
-          file = paste0("Benchmark_data/",
-                        nbRepeats,"rep_",nbLeaves,"leaves_",nb.move,"moves_",
-                        format(Sys.time(), "%H:%M")))
   return (metrics)
 }
-x = benchmark(10, 20, 10)
+x = benchmark(10, 20, 1)
 
 toRun = list(list(500, 100, 1), 
              list(500, 100, 10),
@@ -373,7 +378,9 @@ for (i in toRun){
 }
 
 # Lancement manuel d'une instance ####
-random = createTaxPhy(nbLeaves = 5, nb.move = 1)
+png(filename = "test.png", width = 1920, height = 1080)
+random = createTaxPhy(nbLeaves = 20, nb.move = 1)
+dev.off()
 
 Taxo = random$taxo
 Phylo = random$phylo
