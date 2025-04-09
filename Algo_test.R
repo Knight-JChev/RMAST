@@ -4,7 +4,7 @@ library(stringr)
 library(RcppHungarian)
 # Fonction pour faire la phylo et la taxo.
 # Retourne un vecteur avec taxo, phylo, arbre d'origine
-createTaxPhy <- function(nbLeaves = 5, nb.move = 1){
+createTaxPhy <- function(nbLeaves = 10, nb.move = 5){
   world = rtree(nbLeaves+nb.move, rooted = FALSE)
   (q1 = summary(world$edge.length)[2])
   ttt = sample(1:length(world$tip.label), size = 2*nb.move, replace = F)
@@ -45,7 +45,24 @@ createTaxPhy <- function(nbLeaves = 5, nb.move = 1){
   nodelabels(phylo$node.label, adj = c(1.3,-0.5), frame = "n", cex = 1.5, font = 2, col="red")
   tiplabels(wrongTips, tipToChange, adj=0, bg = "orchid", font = 2, cex = 1.2)
   
+  # Nombre d'arrêtes entre les paires de feuilles déplacées 
+  edgeDist = c()
+  notWrongTips = c()
+  wrongTips = sub(".","",wrongTips)
   
+  for (i in 1:nb.move) {
+    edges = (length(nodepath(world, tip2[i], tip1[i])))-1
+    if (edges == 2) {
+      notWrongTips = append(notWrongTips, tipsNumber[tip2[i]])
+    }
+    edgeDist = append(edgeDist, edges)
+  }
+  
+  if (!(identical(pmatch(notWrongTips, wrongTips), integer(0)))){
+    realWrongTips = wrongTips[-pmatch(notWrongTips, wrongTips)]
+  } else realWrongTips = wrongTips
+  
+    
   taxo[[6]] = "taxo"
   names(taxo)[6] = "name"
   
@@ -53,7 +70,8 @@ createTaxPhy <- function(nbLeaves = 5, nb.move = 1){
   names(phylo)[6] = "name"
   
   return(list(taxo = taxo, phylo = phylo, world = world, 
-              wrongTips = tipsNumber[tip2], truth = tipsNumber[-c(tip2,tip1)]))
+              notWrongTips = notWrongTips, truth = c(tipsNumber[-c(tip2,tip1)], notWrongTips),
+              edgeDist = edgeDist, realWrongTips = realWrongTips))
 }
 
 # Fonction pour faire une dataframe avec le nom des feuilles et noeuds
@@ -101,7 +119,7 @@ mast <- function(subRootTax, subRootPhy, trees){ #On garde les arbres d'origine
   phylo = trees[[base::setdiff(1:2,whichTaxo)]]
   
   # Utiliser les subroot pour faire des sous arbres si la racine est différente
-  print(paste0("SBRT 1 :", subRootTax," depuis Taxo", ";  SBRT 2 : ", subRootPhy, " depuis Phylo")) 
+  #print(paste0("SBRT 1 :", subRootTax," depuis Taxo", ";  SBRT 2 : ", subRootPhy, " depuis Phylo")) 
   
   if (subRootTax != taxo$node.label[1]){
     subTax = extract.clade(taxo, subRootTax)
@@ -118,19 +136,19 @@ mast <- function(subRootTax, subRootPhy, trees){ #On garde les arbres d'origine
   # Calculer des métriques sur les sous arbres
   subTmetrics = treeMetrics(taxo = subTax, phylo = subPhy)
   
-  # Conditions de raccourci
+  # Conditions de raccourci ####
   ## Arrêter s'il n'y a aucune feuille en commun
   commonLeaves = (subTmetrics$leavesTaxo %in% subTmetrics$leavesPhylo)
   overlap = sum(commonLeaves, na.rm=T)
   if (overlap == 0){
-    print(paste0("NOMATCH SBRT 1 :", subRootTax," depuis Taxo", ";  SBRT 2 : ", subRootPhy, " depuis Phylo")) 
+    #print(paste0("NOMATCH SBRT 1 :", subRootTax," depuis Taxo", ";  SBRT 2 : ", subRootPhy, " depuis Phylo")) 
     return ("")
   }
-  ## Si il y a un overlap de 1, retourner la feuille en commun
+  ## Si il y a une feuille en commun; retourner la feuille
   else if (overlap == 1){
     return (subTmetrics$leavesTaxo[which(commonLeaves)])
   }
-  ## Si il y a un overlap de 1, retourner la feuille en commun
+  ## Si il y a deux feuilles en commun; retourner les feuille
   else if (overlap == 2 & length(commonLeaves)>= 2){
     return (paste0(subTmetrics$leavesTaxo[which(commonLeaves)], collapse ="" ))
   }
@@ -142,55 +160,55 @@ mast <- function(subRootTax, subRootPhy, trees){ #On garde les arbres d'origine
     arrange(to)
   
   # Boucle Taxo sur sous-arbre de Phylo ####
-  print("1 :")
+  #print("1 :")
   # Si on est dans un des sous arbre, faire le mast récursivement
   for (subnodePhylo in currentPhyloNode[,2]){ # i = sous-noeuds du noeud en cours
-    print(paste0("1 : Sous-noeud en cours ", subnodePhylo, " de Phylo dans ", subRootTax, " de Taxo"))
+    #print(paste0("1 : Sous-noeud en cours ", subnodePhylo, " de Phylo dans ", subRootTax, " de Taxo"))
     
     if (subnodePhylo %in% subTmetrics$leavesPhylo) {  # si le sous-noeud est une feuille
       if (subnodePhylo %in% subTmetrics$leavesTaxo){ # si cette feuille appartient à l'autre sous-arbre
         mastlist[[1]] = append(mastlist[[1]], subnodePhylo)
-        print(paste0("1 : Mastlist in ", (paste0(mastlist[[1]], collapse = " "))))
+        #print(paste0("1 : Mastlist in ", (paste0(mastlist[[1]], collapse = " "))))
       }
     } else {
       # Ajoute la mastlist des enfants a celle du noeud en cours
       if (is.na(doneMat[subRootTax, subnodePhylo])){
-        print(paste0("ENTREE mastep 1; sous noeud ", subnodePhylo, " de Phylo dans ", subRootTax, " de Taxo"))
+        #print(paste0("ENTREE mastep 1; sous noeud ", subnodePhylo, " de Phylo dans ", subRootTax, " de Taxo"))
         .GlobalEnv$doneMat[subRootTax, subnodePhylo] = mast(subRootTax, subnodePhylo, list(taxo,phylo))
-        print(paste0("SORTIE mastep 1; sous noeud ", subnodePhylo, " de Phylo dans ", subRootTax, " de Taxo"))
+        #print(paste0("SORTIE mastep 1; sous noeud ", subnodePhylo, " de Phylo dans ", subRootTax, " de Taxo"))
       }
       mastlist[[1]] = append(mastlist[[1]], doneMat[subRootTax, subnodePhylo])
-      print(paste0("1 : Mastlist in ", (paste0(mastlist[[1]], collapse = " "))))
+      #print(paste0("1 : Mastlist in ", (paste0(mastlist[[1]], collapse = " "))))
     }
   }
   
-  print(paste0("1 : Mastlist end ", (paste0(mastlist[[1]], collapse = " "))))
+  #print(paste0("1 : Mastlist end ", (paste0(mastlist[[1]], collapse = " "))))
   
   # Boucle Phylo sur sous-arbre de Taxo ####
-  print("2 : ")
+  #print("2 : ")
   # Si on est dans un des sous arbre, faire le mast récursivement
   for (subnodeTaxo in currentTaxoNode[,2]){
-    print(paste0("2 : Sous-noeud en cours ", subnodeTaxo, " de taxo dans ", subRootPhy))
+    #print(paste0("2 : Sous-noeud en cours ", subnodeTaxo, " de taxo dans ", subRootPhy))
     
     if (subnodeTaxo %in% subTmetrics$leavesTaxo) {  # si le sous-noeud est une feuille
       if (subnodeTaxo %in% subTmetrics$leavesPhylo){ # si cette feuille appartient à l'autre sous-arbre
         mastlist[[2]] = append(mastlist[[2]], subnodeTaxo)
-        print(paste0("2 : Mastlist in ", (paste0(mastlist[[2]], collapse = " "))))
+        #print(paste0("2 : Mastlist in ", (paste0(mastlist[[2]], collapse = " "))))
       }
     } else {
       # Ajoute la mastlist des enfants a celle du noeud en cours
       if (is.na(doneMat[subnodeTaxo, subRootPhy])){
-        print(paste0("ENTREE mastep 2; sous noeud ", subnodeTaxo, " de Taxo dans ", subRootPhy, " de Phylo"))
+        #print(paste0("ENTREE mastep 2; sous noeud ", subnodeTaxo, " de Taxo dans ", subRootPhy, " de Phylo"))
         .GlobalEnv$doneMat[subnodeTaxo, subRootPhy] = mast(subnodeTaxo, subRootPhy, list(taxo,phylo))
-        print(paste0("SORTIE mastep 2; sous noeud ", subnodeTaxo, " de Taxo dans ", subRootPhy, " de Phylo"))
+        #print(paste0("SORTIE mastep 2; sous noeud ", subnodeTaxo, " de Taxo dans ", subRootPhy, " de Phylo"))
       }
       mastlist[[2]] = append(mastlist[[2]], doneMat[subnodeTaxo, subRootPhy])
     }
   }
-  print(paste0("2 : Mastlist end ", (paste0(mastlist[[2]], collapse = " "))))
+  #print(paste0("2 : Mastlist end ", (paste0(mastlist[[2]], collapse = " "))))
   
   # Matching des sous-arbres ####
-  print("3 : ")
+  #print("3 : ")
   # Matrice des produits cartésiens avec sous-noeuds de phylo en colonne et de taxo en ligne
   associations = matrix(nrow = nrow(currentTaxoNode), ncol = nrow(currentPhyloNode), 
                         dimnames = list(c(paste0("taxo",currentTaxoNode[,2])),
@@ -201,7 +219,7 @@ mast <- function(subRootTax, subRootPhy, trees){ #On garde les arbres d'origine
     for (j in 1:nrow(currentPhyloNode)){
       iNode = currentTaxoNode[i,2]
       jNode = currentPhyloNode[j,2]
-      print (paste0("i : ", iNode, "; j : ", jNode))
+      #print (paste0("i : ", iNode, "; j : ", jNode))
       
       # Si l'un des noeuds courant est une feuille
       if ((iNode %in% subTmetrics$leavesTaxo) && 
@@ -231,21 +249,21 @@ mast <- function(subRootTax, subRootPhy, trees){ #On garde les arbres d'origine
           countMat[i,j] = 0
         }
       } else {
-        print(paste0("SORTIE mastep 3; sous noeuds ", iNode, " et ", jNode))
+        #print(paste0("SORTIE mastep 3; sous noeuds ", iNode, " et ", jNode))
         associations[i,j] = mast(subRootTax = iNode, 
                                      subRootPhy = jNode, 
                                      list(taxo, phylo))
-        print(paste0("SORTIE mastep 3; sous noeuds ", iNode, " et ", jNode))
+        #print(paste0("SORTIE mastep 3; sous noeuds ", iNode, " et ", jNode))
         countMat[i,j] = str_count(associations[i,j], pattern = "t")
       }
-      print(countMat[i,j])
+      #print(countMat[i,j])
     }  
   }
   
   # Inverser la countMat pour résoudre maximisation avec Algo Hongrois 
   countMat = abs(countMat - max(countMat))
-  print("countMatrix :")
-  print(countMat)
+  #print("countMatrix :")
+  #print(countMat)
   bestmatches = HungarianSolver(countMat)$pairs
   
   # Retire les matchs sans optimum dans une matrice rectangle
@@ -257,38 +275,40 @@ mast <- function(subRootTax, subRootPhy, trees){ #On garde les arbres d'origine
     mastlist[[3]] = append(mastlist[[3]], associations[bestmatches[i,1], bestmatches[i,2]])
   }
   mastlist[[3]] = gsub("NA", "", paste0(mastlist[[3]], collapse="")) 
-  print(paste0("3 : Mastlist end ", (paste0(mastlist[[3]], collapse = " "))))
+  #print(paste0("3 : Mastlist end ", (paste0(mastlist[[3]], collapse = " "))))
   
   # Choisir le max de la mastlist ####
   besthit = c()
   for (i in 1:length(mastlist)){
-    print(paste0("Mastlist : ",i, " ", (paste0(mastlist[[i]], collapse = " "))))
+    #print(paste0("Mastlist : ",i, " ", (paste0(mastlist[[i]], collapse = " "))))
     
     besthit = append(besthit, 
                      mastlist[[i]][which.max(lapply(mastlist[[i]], str_count, pattern = "t"))])
   }
   
-  print(paste0("besthits :",besthit))
-  print(besthit[which.max(lapply(besthit, str_count, pattern = "t"))])
+  #print(paste0("besthits :",besthit))
+  #print(besthit[which.max(lapply(besthit, str_count, pattern = "t"))])
   return (besthit[which.max(lapply(besthit, str_count, pattern = "t"))])
 }
 
 # Benchmark sur des arbres aléatoires
 benchmark <- function(nbRepeats, nbLeaves, nb.move){
   
-  metrics = list(allPrecision = c(),
-                 allRecall = c(),
-                 allAccuracy = c(),
-                 nbRepeats = nbRepeats,
-                 nbLeaves = nbLeaves,
-                 nb.move = nb.move) 
+  # Variable de stockage des résultats
+  metrics = data.frame() 
   
+  # Boucle pour atteindre le nombre de répétitions
+  print(paste0("Tree 1 / ",nbRepeats, " ongoing"))
   for (rep in 1:nbRepeats){
-    random = createTaxPhy(nbLeaves = 50, nb.move = 5)
+    
+    # Création des arbres aléatoires avec feuilles déplacées
+    random = createTaxPhy(nbLeaves = nbLeaves, nb.move = nb.move)
     
     Taxo = random$taxo
     Phylo = random$phylo
-    doneMat = matrix(nrow = Taxo$Nnode, 
+    
+    # Matrice d'enregistrement des résultats de mast en cours
+    .GlobalEnv$doneMat = matrix(nrow = Taxo$Nnode, 
                       ncol = Phylo$Nnode, 
                       dimnames = list(Taxo$node.label, Phylo$node.label))
     
@@ -297,26 +317,59 @@ benchmark <- function(nbRepeats, nbLeaves, nb.move){
                              subRootPhy = Phylo$node.label[1],
                              trees = list(Taxo,Phylo)),"t")[[1]][-1]
     
-    # Calcul des métriques
-    TP = length(na.omit(match(resultat, random$truth)))
-    precision = TP / length(resultat)
-    recall = TP / length(random$truth)
-    accuracy = TP + length(setdiff(random$wrongTips, resultat)) / 
-      length(c(random$truth, random$wrongTips))
-
-    metrics$allPrecision = append(metrics$allPrecision, precision)
-    metrics$allRecall = append(metrics$allRecall, recall)
-    metrics$allAcccuracy = append(metrics$allAccuracy, accuracy)
+    # Calcul des métriques : positif = feuille déplacée non retenue
+    # TP = feuilles dégagées censées l'être
+    TP = length(match(setdiff(random$realWrongTips, resultat), random$realWrongTips))
+    FP = length(setdiff(random$truth, resultat)) # Feuilles dégagées censées être retenues
+    TN = sum(resultat %in% random$truth) # Feuilles retenues censées l'être
+    FN = sum(resultat %in% random$realWrongTips) # Feuilles retenues censées être dégagées
     
+    precision = TP / (TP + FP)
+    recall = TP / (TP + FN)
+    accuracy = (TP + TN) / 
+      length(c(random$truth, random$realWrongTips))
+    
+    # Remplissage d'une table pour l'arbre en cours
+    df = data.frame(nbRepeats = nbRepeats,
+                    nbLeaves = nbLeaves,
+                    nb.move = nb.move,
+                    obsTreeSize = length(resultat),
+                    expErrorSize = length(random$realWrongTips),
+                    TP = TP,
+                    FP = FP,
+                    TN = TN,
+                    FN = FN,
+                    Accuracy = accuracy,
+                    Precision = precision,
+                    Recall = recall)
+    
+    df$edgeDist = list(random$edgeDist)
+    df$truth = list(random$truth)
+    df$realWrongTips = list(random$realWrongTips)
+    
+    metrics = rbind(metrics, df)
+    print(df[1, 1:12])
+    
+    print(paste0("Tree  ",rep," / ",nbRepeats, " done"))
   }
   
-  metrics$avgPrecision = mean(metrics$allPrecision)
-  metrics$avgRecall = mean(metrics$allRecall)
-  metrics$avgAcccuracy = mean(metrics$allAccuracy)
   
-  print(summary(metrics))
-  
+
+  saveRDS(metrics, 
+          file = paste0("Benchmark_data/",
+                        nbRepeats,"rep_",nbLeaves,"leaves_",nb.move,"moves_",
+                        format(Sys.time(), "%H:%M")))
   return (metrics)
+}
+x = benchmark(10, 20, 10)
+
+toRun = list(list(500, 100, 1), 
+             list(500, 100, 10),
+             list(500, 100, 25),
+             list(500, 100, 50))
+
+for (i in toRun){
+ do.call(benchmark, i)
 }
 
 # Lancement manuel d'une instance ####
@@ -339,6 +392,7 @@ test <- function (a,b){
   return (a+b)
 }
 
+df$edgeDist = list(c("bonjor","aurev"))
 # Réservoir ####
 liste = c("abc", "de", "gklm")
 res = liste[which.max(lapply(liste, nchar))]
