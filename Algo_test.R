@@ -45,7 +45,7 @@ createTaxPhy <- function(nbLeaves = 10, nb.move = 5){
   nodelabels(phylo$node.label, adj = c(1.3,-0.5), frame = "n", cex = 1.5, font = 2, col="red")
   tiplabels(wrongTips, tipToChange, adj=0, bg = "orchid", font = 2, cex = 1.2)
   
-  # Nombre d'arrêtes entre les paires de feuilles déplacées 
+  # Nombre d'arrêtes entre les paires de feuilles déplacées ####
   edgeDist = c()
   notWrongTips = c()
   wrongTips = sub(".","",wrongTips)
@@ -327,22 +327,28 @@ benchmark <- function(nbRepeats, nbLeaves, nb.move){
                              trees = list(Taxo,Phylo)),"t")[[1]][-1]
     
     # Calcul des métriques : positif = feuille déplacée non retenue
-    # TP = feuilles dégagées censées l'être
-    TP = length(match(setdiff(random$realWrongTips, resultat), random$realWrongTips))
-    FP = length(setdiff(random$truth, resultat)) # Feuilles dégagées censées être retenues
-    TN = sum(resultat %in% random$truth) # Feuilles retenues censées l'être
-    FN = sum(resultat %in% random$realWrongTips) # Feuilles retenues censées être dégagées
+    TPtips = setdiff(random$realWrongTips, resultat) # Feuilles dégagées censées l'être
+    FPtips = setdiff(random$truth, resultat) # Feuilles dégagées censées être retenues
+    TNtips = resultat[which(resultat %in% random$truth)] # Feuilles retenues censées l'être
+    FNtips = resultat[which(resultat %in% random$realWrongTips)] # Feuilles retenues censées être dégagées
     
+    TP = length(TPtips)
+    FP = length(FPtips)
+    TN = length(TNtips)
+    FN = length(FNtips)
+
     precision = TP / (TP + FP)
     recall = TP / (TP + FN)
     accuracy = (TP + TN) / length(c(random$truth, random$realWrongTips))
     
+    which((setdiff(random$realWrongTips, resultat) %in% random$realWrongTips))
+
     # Remplissage d'une table pour l'arbre en cours
-    df = data.frame(nbRepeats = as.factor(nbRepeats),
-                    nbLeaves = as.factor(nbLeaves),
+    df = data.frame(nbRepeats = nbRepeats,
+                    nbLeaves = nbLeaves,
                     nb.move = as.factor(nb.move),
-                    obsTreeSize = as.factor(length(resultat)),
-                    expErrorSize = as.factor(length(random$realWrongTips)),
+                    obsTreeSize = length(resultat),
+                    expErrorSize = length(random$realWrongTips),
                     TP = TP,
                     FP = FP,
                     TN = TN,
@@ -350,10 +356,15 @@ benchmark <- function(nbRepeats, nbLeaves, nb.move){
                     Accuracy = accuracy,
                     Precision = precision,
                     Recall = recall)
-    
-    df$edgeDist = list(random$edgeDist)
+    df$resultat = list(resultat)
     df$truth = list(random$truth)
     df$realWrongTips = list(random$realWrongTips)
+    df$TPtips = list(TPtips)
+    df$FPtips = list(FPtips)
+    df$TNtips = list(TNtips)
+    df$FNtips = list(FNtips) 
+    df$edgeDist = list(random$edgeDist)
+    df$perfect = as.factor(ifelse(df$Accuracy==1, 1,0))
     
     metrics = rbind(metrics, df)
     print(df[1, 1:12])
@@ -366,7 +377,7 @@ benchmark <- function(nbRepeats, nbLeaves, nb.move){
   
   return (metrics)
 }
-x = benchmark(10, 20, 1)
+x = benchmark(15, 20, 5)
 
 toRun = list(list(500, 100, 1), 
              list(500, 100, 10),
