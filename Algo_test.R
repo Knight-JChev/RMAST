@@ -71,8 +71,110 @@ createTaxPhy <- function(nbLeaves = 10, nb.move = 5){
   
   return(list(taxo = taxo, phylo = phylo, world = world, 
               notWrongTips = notWrongTips, truth = c(tipsNumber[-c(tip2,tip1)], notWrongTips),
-              edgeDist = edgeDist, realWrongTips = realWrongTips))
+              edgeDist = edgeDist, realWrongTips = realWrongTips, wrongTips = wrongTips))
 }
+
+# Retourne un vecteur avec taxo, phylo, arbre d'origine
+createTaxPhyAlt <- function(nbLeaves = 20, nb.move = 2, dist = 3){
+  
+  # Vérif 
+  if (dist <= 2 || dist > nbLeaves/2){
+    return(print("Argument 'dist', has to be between 2 and half the number of leaves"))
+  }
+  # Création de l'arbre monde pour faire la taxo et la phylo
+  taxo = rtree(nbLeaves+nb.move, rooted = FALSE)
+  taxo$edge.length[] <- 1 # Toutes les arrêtes font 1 de long
+  
+  # Matrice de distance et choix des feuilles ####
+  # Récupérer des couples à une certaine distance 
+  # Peux pas prendre 2 fois la même feuille
+  distMat = cophenetic.phylo(taxo) 
+  distMat[lower.tri(distMat)] <- NA
+  tmpcoords = data.frame(which(distMat == dist, arr.ind = T)) # Coordonnées OK
+  # Enlever doubles dans ligne; dans colonnes; entre lignes et colonnes
+  tmpcoords = distinct(tmpcoords, row, .keep_all = T) 
+  tmpcoords = distinct(tmpcoords, col, .keep_all = T) 
+  tmpcoords = tmpcoords[-(na.omit(match(tmpcoords$row, tmpcoords$col))),]
+  
+  # Choix de le feuille à déplacer et de la feuille où déplacer
+  tipMoved = c()
+  tipTo = c()
+  i = 1
+  if (nrow(tmpcoords) >= nb.move){ # Au moins autant de résultats que demandé
+    while (i <= nb.move){
+        tipTo = append(tipTo, tmpcoords[i,1])
+        tipMoved = append(tipMoved, tmpcoords[i,2])
+        i = i+1
+    }
+  } else return(createTaxPhyAlt(nbLeaves, nb.move, dist)) # Sinon, relancer
+
+  # Formatage pour benchmark
+  tipsNumber = sub(".", "", taxo$tip.label)
+  wrongTips = taxo$tip.label[tipMoved]
+  
+  # Création arbre phylo ####
+  #' [Visu taxo et phylo]
+  par(xpd = TRUE) # Permettre à la légende de sortir du cadre de la figure
+  taxo = makeNodeLabel(taxo, method = "number", prefix = "tax") 
+  
+  layout(matrix(c(1,2),1,2)) # Matrice pour tracer les plots
+  
+  # Plot arbre taxo avec les bons nom
+  plot(taxo, cex = 1, main = "taxo", font = 2)
+  nodelabels(taxo$node.label, adj = c(1,-0.2), frame = "n", cex = 0.8, font = 2, col="red")
+  tiplabels(taxo$tip.label[tipTo], tipTo, adj=0, font = 2, cex = 1, bg = "mediumpurple1")
+  tiplabels(wrongTips, tipMoved, adj=0, bg = "lightblue", font = 2, cex = 1)
+  
+  # Création arbre phylo
+  phylo = taxo
+  tipToAdjust = c()
+  for (i in 1:length(tipMoved)){
+    # Ajuste l'indice des feuilles dans phylo comme on en enlève une par une
+    tipToAdjust = append(tipToAdjust, tipTo[i]-(i-1)) 
+    tmptree = keep.tip(taxo, taxo$tip.label[tipMoved[i]])
+    phylo = drop.tip(phylo, taxo$tip.label[tipMoved[i]])
+    phylo = bind.tree(phylo, tmptree, where = tipToAdjust[i], position =  0.5)
+  }
+  phylo$edge.length[] <- 1
+  
+  # Plot arbre phylo
+  tipMovedTo = match(taxo$tip.label[tipMoved], phylo$tip.label)
+  phylo = makeNodeLabel(phylo, method = "number", prefix = "phy")
+  plot(phylo, main = "Phylo", cex = 1, font = 2)
+  nodelabels(phylo$node.label, adj = c(1,-0.2), frame = "n", cex = 0.8, font = 2, col="red")
+  tiplabels(taxo$tip.label[tipTo], tipToAdjust, adj=0, bg = "mediumpurple1", font = 2, cex = 1)
+  tiplabels(taxo$tip.label[tipMoved], tipMovedTo, adj=0, bg = "lightblue", font = 2, cex = 1)
+  
+  
+  # Nombre d'arrêtes entre les paires de feuilles déplacées ####
+  edgeDist = c()
+  notWrongTips = c()
+  wrongTips = sub(".","",wrongTips)
+  
+  for (i in 1:nb.move) {
+    edges = (length(nodepath(taxo, tipMoved[i], tipTo[i])))-1
+    if (edges == 2) {
+      notWrongTips = append(notWrongTips, tipsNumber[tipMoved[i]])
+    }
+    edgeDist = append(edgeDist, edges)
+  }
+  
+  if (!(identical(pmatch(notWrongTips, wrongTips), integer(0)))){
+    realWrongTips = wrongTips[-pmatch(notWrongTips, wrongTips)]
+  } else realWrongTips = wrongTips
+  
+  
+  taxo[[6]] = "taxo"
+  names(taxo)[6] = "name"
+  
+  phylo[[6]] = "phylo"
+  names(phylo)[6] = "name"
+  
+  return(list(taxo = taxo, phylo = phylo, 
+              notWrongTips = notWrongTips, truth = c(tipsNumber[-c(tipMoved,tipTo)], notWrongTips),
+              edgeDist = edgeDist, realWrongTips = realWrongTips, wrongTips = wrongTips))
+}
+random = createTaxPhyAlt(nbLeaves = 20, nb.move = 2, dist = 3)
 
 # Fonction pour faire une dataframe avec le nom des feuilles et noeuds
 edgesToDf <- function(tree){
@@ -287,13 +389,12 @@ mast <- function(subRootTax, subRootPhy, trees){ #On garde les arbres d'origine
   }
   
   #print(paste0("besthits :",besthit))
-  #print(besthit[which.max(lapply(besthit, str_count, pattern = "t"))])
+  #print(paste0("meilleur = ",besthit[which.max(lapply(besthit, str_count, pattern = "t"))]))
   return (besthit[which.max(lapply(besthit, str_count, pattern = "t"))])
 }
 
 # Benchmark sur des arbres aléatoires
-benchmark <- function(nbRepeats, nbLeaves, nb.move){
-  
+benchmark <- function(nbRepeats, nbLeaves, nb.move, phyType = "Normal", dist){
   # Dossiers et fichiers de stockage
   dirNameFig = paste0("Benchmark_data/", format(Sys.time(), "%H%M"), "_Figures_", nbRepeats,"rep")
   fileName = paste0(format(Sys.time(), "%H%M"),"_",nbRepeats,"rep_",nbLeaves,"leaves_",nb.move,"moves")
@@ -310,7 +411,9 @@ benchmark <- function(nbRepeats, nbLeaves, nb.move){
     
     # Création + sauvegarde des arbres aléatoires avec feuilles déplacées
     png(filename = paste0(dirNameFig,"/",fileName,"_",rep), width = 1920, height = 1080)
-    random = createTaxPhy(nbLeaves = nbLeaves, nb.move = nb.move)
+    if (phyType == "Alt"){
+      random = createTaxPhyAlt(nbLeaves = nbLeaves, nb.move = nb.move, dist = dist)
+    } else  random = createTaxPhy(nbLeaves = nbLeaves, nb.move = nb.move)
     dev.off()
     
     Taxo = random$taxo
@@ -344,7 +447,8 @@ benchmark <- function(nbRepeats, nbLeaves, nb.move){
     which((setdiff(random$realWrongTips, resultat) %in% random$realWrongTips))
 
     # Remplissage d'une table pour l'arbre en cours
-    df = data.frame(nbRepeats = nbRepeats,
+    df = data.frame(id = rep,
+                    nbRepeats = nbRepeats,
                     nbLeaves = nbLeaves,
                     nb.move = as.factor(nb.move),
                     obsTreeSize = length(resultat),
@@ -358,13 +462,19 @@ benchmark <- function(nbRepeats, nbLeaves, nb.move){
                     Recall = recall)
     df$resultat = list(resultat)
     df$truth = list(random$truth)
+    df$wrongTips = list(random$wrongTips)
     df$realWrongTips = list(random$realWrongTips)
     df$TPtips = list(TPtips)
-    df$FPtips = list(FPtips)
     df$TNtips = list(TNtips)
+    df$FPtips = list(FPtips)
     df$FNtips = list(FNtips) 
     df$edgeDist = list(random$edgeDist)
     df$perfect = as.factor(ifelse(df$Accuracy==1, 1,0))
+    
+    if (phyType == "Alt"){
+      df$dist = dist
+      df = df %>% relocate(dist, .after = nb.move)
+    }
     
     metrics = rbind(metrics, df)
     print(df[1, 1:12])
@@ -377,7 +487,7 @@ benchmark <- function(nbRepeats, nbLeaves, nb.move){
   
   return (metrics)
 }
-x = benchmark(15, 20, 5)
+x = benchmark(nbRepeats = 15, nbLeaves = 20, nb.move = 1, dist = 5, phyType = "Alt")
 
 toRun = list(list(500, 100, 1), 
              list(500, 100, 10),
@@ -388,10 +498,11 @@ for (i in toRun){
  do.call(benchmark, i)
 }
 
+node.height(random$taxo)
+plot(random$taxo)
+
 # Lancement manuel d'une instance ####
-png(filename = "test.png", width = 1920, height = 1080)
-random = createTaxPhy(nbLeaves = 20, nb.move = 1)
-dev.off()
+random = createTaxPhyAlt(nbLeaves = 20, nb.move = 2, dist = 3)
 
 Taxo = random$taxo
 Phylo = random$phylo
@@ -409,8 +520,10 @@ test <- function (a,b){
   }
   return (a+b)
 }
-
+unique(matrix(c(1, 2, 3, 4, 5, 6, 1, 2, 3, 6, 5, 4), nrow = 3, ncol = 4), MARGIN = 2)
 df$edgeDist = list(c("bonjor","aurev"))
+
+
 # Réservoir ####
 liste = c("abc", "de", "gklm")
 res = liste[which.max(lapply(liste, nchar))]
