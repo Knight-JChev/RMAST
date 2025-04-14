@@ -75,14 +75,14 @@ createTaxPhy <- function(nbLeaves = 10, nb.move = 5){
 }
 
 # Retourne un vecteur avec taxo, phylo, arbre d'origine
-createTaxPhyAlt <- function(nbLeaves = 20, nb.move = 2, dist = 3){
+createTaxPhyAlt <- function(nbLeaves = 10, nb.move = 2, dist = 4){
   
   # Vérif 
   if (dist <= 2 || dist > nbLeaves/2){
     return(print("Argument 'dist', has to be between 2 and half the number of leaves"))
   }
   # Création de l'arbre monde pour faire la taxo et la phylo
-  taxo = rtree(nbLeaves+nb.move, rooted = FALSE)
+  taxo = rtree(nbLeaves, rooted = FALSE)
   taxo$edge.length[] <- 1 # Toutes les arrêtes font 1 de long
   
   # Matrice de distance et choix des feuilles ####
@@ -120,7 +120,7 @@ createTaxPhyAlt <- function(nbLeaves = 20, nb.move = 2, dist = 3){
   layout(matrix(c(1,2),1,2)) # Matrice pour tracer les plots
   
   # Plot arbre taxo avec les bons nom
-  plot(taxo, cex = 1, main = "taxo", font = 2)
+  plot(taxo, cex = 1, main = "Taxo", font = 2)
   nodelabels(taxo$node.label, adj = c(1,-0.2), frame = "n", cex = 0.8, font = 2, col="red")
   tiplabels(taxo$tip.label[tipTo], tipTo, adj=0, font = 2, cex = 1, bg = "mediumpurple1")
   tiplabels(wrongTips, tipMoved, adj=0, bg = "lightblue", font = 2, cex = 1)
@@ -130,9 +130,10 @@ createTaxPhyAlt <- function(nbLeaves = 20, nb.move = 2, dist = 3){
   tipToAdjust = c()
   for (i in 1:length(tipMoved)){
     # Ajuste l'indice des feuilles dans phylo comme on en enlève une par une
-    tipToAdjust = append(tipToAdjust, tipTo[i]-(i-1)) 
     tmptree = keep.tip(taxo, taxo$tip.label[tipMoved[i]])
     phylo = drop.tip(phylo, taxo$tip.label[tipMoved[i]])
+    tipToAdjust = append(tipToAdjust,
+                         which(phylo$tip.label == taxo$tip.label[tipTo[i]])) 
     phylo = bind.tree(phylo, tmptree, where = tipToAdjust[i], position =  0.5)
   }
   phylo$edge.length[] <- 1
@@ -174,7 +175,6 @@ createTaxPhyAlt <- function(nbLeaves = 20, nb.move = 2, dist = 3){
               notWrongTips = notWrongTips, truth = c(tipsNumber[-c(tipMoved,tipTo)], notWrongTips),
               edgeDist = edgeDist, realWrongTips = realWrongTips, wrongTips = wrongTips))
 }
-random = createTaxPhyAlt(nbLeaves = 20, nb.move = 2, dist = 3)
 
 # Fonction pour faire une dataframe avec le nom des feuilles et noeuds
 edgesToDf <- function(tree){
@@ -396,8 +396,13 @@ mast <- function(subRootTax, subRootPhy, trees){ #On garde les arbres d'origine
 # Benchmark sur des arbres aléatoires
 benchmark <- function(nbRepeats, nbLeaves, nb.move, phyType = "Normal", dist){
   # Dossiers et fichiers de stockage
-  dirNameFig = paste0("Benchmark_data/", format(Sys.time(), "%H%M"), "_Figures_", nbRepeats,"rep")
-  fileName = paste0(format(Sys.time(), "%H%M"),"_",nbRepeats,"rep_",nbLeaves,"leaves_",nb.move,"moves")
+  if (phyType == "Alt"){
+    dirNameFig = paste0("Benchmark_data/", format(Sys.time(), "%H%M%S"), dist,"dist_",nb.move,"moves_",nbRepeats,"rep_Fig")
+    fileName = paste0(format(Sys.time(), "%H%M%S"),"_",dist,"dist_",nb.move,"moves_",nbLeaves,"leaves_",nbRepeats,"rep")
+  } else {  
+    dirNameFig = paste0("Benchmark_data/", format(Sys.time(), "%H%M%S"), nb.move,"moves_", nbRepeats,"rep_Fig")
+    fileName = paste0(format(Sys.time(), "%H%M%S"),"_",nb.move,"moves_",nbLeaves,"leaves_",nbRepeats,"rep")
+  }
   
   ifelse(!dir.exists(file.path(dirNameFig)), dir.create(file.path(dirNameFig)), "Figure Directory already exists")
 
@@ -472,7 +477,7 @@ benchmark <- function(nbRepeats, nbLeaves, nb.move, phyType = "Normal", dist){
     df$perfect = as.factor(ifelse(df$Accuracy==1, 1,0))
     
     if (phyType == "Alt"){
-      df$dist = dist
+      df$dist = as.factor(dist)
       df = df %>% relocate(dist, .after = nb.move)
     }
     
@@ -487,22 +492,43 @@ benchmark <- function(nbRepeats, nbLeaves, nb.move, phyType = "Normal", dist){
   
   return (metrics)
 }
-x = benchmark(nbRepeats = 15, nbLeaves = 20, nb.move = 1, dist = 5, phyType = "Alt")
+x = benchmark(nbRepeats = 20, nbLeaves = 40, nb.move = 5, dist = 5, phyType = "Alt")
 
-toRun = list(list(500, 100, 1), 
-             list(500, 100, 10),
-             list(500, 100, 25),
-             list(500, 100, 50))
-
+toRun = list(list(1, 10, 1,  "Alt", 3), 
+             list(1, 10, 2,  "Alt", 3))
+             #list(1, 10, 10, "Alt", 5))
+autre = list(1,2,3,4)
+  
 for (i in toRun){
- do.call(benchmark, i)
+  print(class(i))
+  #do.call(benchmark, i)
 }
+
+bench_par <- function(arglist){
+  
+  Ncpus <- parallel::detectCores() - 2
+  cl <- parallel::makeCluster(Ncpus)
+  doParallel::registerDoParallel(cl)
+  
+  foreach::foreach(i=1:length(arglist), 
+                   .export =c("benchmark", "createTaxPhyAlt", "mast", 
+                              "treeMetrics", "edgesToDf"),
+                   .packages = c("ape","RcppHungarian", 
+                                 "stringr", "dplyr")) %dopar% {
+    pritn(paste0("Intance ", i))
+    return(do.call(what = benchmark, arglist[[i]]))
+  }
+  
+  parallel::stopCluster(cl)
+  return(res)
+}
+
 
 node.height(random$taxo)
 plot(random$taxo)
 
 # Lancement manuel d'une instance ####
-random = createTaxPhyAlt(nbLeaves = 20, nb.move = 2, dist = 3)
+random = createTaxPhyAlt(nbLeaves = 20, nb.move = 2, dist = 5)
 
 Taxo = random$taxo
 Phylo = random$phylo
