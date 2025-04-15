@@ -130,9 +130,47 @@ for (file in list.files(dir)){
   
   ggplot(pamal, aes(x = dist, y = nb.move, fill = n, label = n)) +
     geom_tile() +
-    geom_text(col = "pink") +
+    geom_text(col = "rosybrown1") +
     scale_fill_viridis_c(begin = 0.2, end = 0.6, direction = -1, option = "plasma")+
-    theme_bw()
+    labs (title = "Feuilles erronnées retenues en fonction de la distance de déplacement",
+          x = "Distance de déplacement",
+          y = "Nombre de feuilles déplacées",
+          subtitle = paste0("20 arbres de 40 feuilles par case"))+
+    theme_bw() + theme(panel.background = element_blank(),
+                       panel.border = element_blank(),
+                       panel.grid = element_blank(),
+                       axis.title = element_text(color = "black", size = 12),
+                       axis.ticks = element_line(),
+                       axis.text = element_text(color = "black", size = 10, face = "bold"),
+                       axis.line = element_blank())+
+    scale_y_discrete(expand = c(0,0)) +
+    scale_x_discrete(expand = c(0,0))
+  
+  ## Matrice de couleur "normalisée"
+  metricsframe %>% group_by(nbLeaves, nbRepeats, nb.move, dist) %>%
+    count(perfect, FN) %>%
+    reframe(matval = FN*n) %>%
+    group_by(nbLeaves, nbRepeats, nb.move, dist) %>%
+    tally(matval) %>%
+    mutate(normVal = n/(as.numeric(levels(nb.move)[nb.move])*nbRepeats))
+  
+  ggplot(mieux, aes(x = dist, y = nb.move, fill = normVal , label = normVal)) +
+    geom_tile() +
+    geom_text(col = "rosybrown1") +
+    scale_fill_viridis_c(begin = 0.2, end = 0.6, direction = -1, option = "plasma")+
+    labs (title = "Pourcentage d'erreurs retenues sur erreurs possibles",
+          x = "Distance de déplacement",
+          y = "Nombre de feuilles déplacées",
+          subtitle = paste0("20 arbres de 40 feuilles par case"))+
+    theme_bw() + theme(panel.background = element_blank(),
+                       panel.border = element_blank(),
+                       panel.grid = element_blank(),
+                       axis.title = element_text(color = "black", size = 12),
+                       axis.ticks = element_line(),
+                       axis.text = element_text(color = "black", size = 10, face = "bold"),
+                       axis.line = element_blank())+
+    scale_y_discrete(expand = c(0,0)) +
+    scale_x_discrete(expand = c(0,0))
   
   ## Nombre d'erreurs par distance entre feuilles déplacées ----
   tb = metricsframe %>% filter (FN >= 1) # Garder que les cas avec erreurs retenues
