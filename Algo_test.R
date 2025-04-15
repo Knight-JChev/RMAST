@@ -4,7 +4,7 @@ library(stringr)
 library(RcppHungarian)
 # Fonction pour faire la phylo et la taxo.
 # Retourne un vecteur avec taxo, phylo, arbre d'origine
-createTaxPhy <- function(nbLeaves = 10, nb.move = 5){
+createTaxPhy <- function(nbLeaves = 10, nb.move = 5, dist = 3, phyType = "Normal"){
   world = rtree(nbLeaves+nb.move, rooted = FALSE)
   (q1 = summary(world$edge.length)[2])
   ttt = sample(1:length(world$tip.label), size = 2*nb.move, replace = F)
@@ -81,7 +81,7 @@ createTaxPhyAlt <- function(nbLeaves = 10, nb.move = 2, dist = 4){
   if (dist <= 2 || dist > nbLeaves/2){
     return(print("Argument 'dist', has to be between 2 and half the number of leaves"))
   }
-  # Création de l'arbre monde pour faire la taxo et la phylo
+  # Création de l'arbre taxo
   taxo = rtree(nbLeaves, rooted = FALSE)
   taxo$edge.length[] <- 1 # Toutes les arrêtes font 1 de long
   
@@ -210,6 +210,18 @@ treeMetrics <- function (taxo, phylo){
   return(metrics)
 }
 
+# Trouver le meilleur hit dans une liste
+findBest <- function(hitlist) {
+  hits = lapply(hitlist, str_count, pattern = "t")
+  maxhits = which(hits == max(unlist(hits)))
+  if (length(maxhits) > 1){
+    besthits = hitlist[sample(maxhits,1)]
+  } else {
+    besthits = hitlist[maxhits]
+  }
+  return(besthits)
+}
+
 # Maximum agreement subtree
 mast <- function(subRootTax, subRootPhy, trees){ #On garde les arbres d'origine
   # Initialisation des variables ####
@@ -225,14 +237,12 @@ mast <- function(subRootTax, subRootPhy, trees){ #On garde les arbres d'origine
   
   if (subRootTax != taxo$node.label[1]){
     subTax = extract.clade(taxo, subRootTax)
-  }
-  else { subTax = taxo
+  } else { subTax = taxo
   }
   
   if (subRootPhy != phylo$node.label[1]){
     subPhy = extract.clade(phylo, subRootPhy)
-  }
-  else { subPhy = phylo
+  } else { subPhy = phylo
   }
   
   # Calculer des métriques sur les sous arbres
@@ -245,13 +255,13 @@ mast <- function(subRootTax, subRootPhy, trees){ #On garde les arbres d'origine
   if (overlap == 0){
     #print(paste0("NOMATCH SBRT 1 :", subRootTax," depuis Taxo", ";  SBRT 2 : ", subRootPhy, " depuis Phylo")) 
     return ("")
-  }
+  
   ## Si il y a une feuille en commun; retourner la feuille
-  else if (overlap == 1){
+  }else if (overlap == 1){
     return (subTmetrics$leavesTaxo[which(commonLeaves)])
-  }
+  
   ## Si il y a deux feuilles en commun; retourner les feuille
-  else if (overlap == 2 & length(commonLeaves)>= 2){
+  }else if (overlap == 2 & length(commonLeaves)>= 2){
     return (paste0(subTmetrics$leavesTaxo[which(commonLeaves)], collapse ="" ))
   }
   
@@ -379,28 +389,27 @@ mast <- function(subRootTax, subRootPhy, trees){ #On garde les arbres d'origine
   mastlist[[3]] = gsub("NA", "", paste0(mastlist[[3]], collapse="")) 
   #print(paste0("3 : Mastlist end ", (paste0(mastlist[[3]], collapse = " "))))
   
-  # Choisir le max de la mastlist ####
-  besthit = c()
+  # Choisir le max de la mastlist, aléatoire si plusieurs max ####
+  besthits = rep(1,length(mastlist))
   for (i in 1:length(mastlist)){
     #print(paste0("Mastlist : ",i, " ", (paste0(mastlist[[i]], collapse = " "))))
-    
-    besthit = append(besthit, 
-                     mastlist[[i]][which.max(lapply(mastlist[[i]], str_count, pattern = "t"))])
+    besthits[i] = findBest(mastlist[[i]])
   }
+  res = findBest(besthits)
   
-  #print(paste0("besthits :",besthit))
-  #print(paste0("meilleur = ",besthit[which.max(lapply(besthit, str_count, pattern = "t"))]))
-  return (besthit[which.max(lapply(besthit, str_count, pattern = "t"))])
+  print(paste0("besthits :", besthits))
+  print(paste0("meilleur = ", res))
+  return (res) # Meilleur aléatoire
 }
 
 # Benchmark sur des arbres aléatoires
 benchmark <- function(nbRepeats, nbLeaves, nb.move, phyType = "Normal", dist){
   # Dossiers et fichiers de stockage
   if (phyType == "Alt"){
-    dirNameFig = paste0("Benchmark_data/", format(Sys.time(), "%H%M%S"), dist,"dist_",nb.move,"moves_",nbRepeats,"rep_Fig")
+    dirNameFig = paste0("Benchmark_data/", format(Sys.time(), "%H%M%S"),"_", dist,"dist_",nb.move,"moves_",nbRepeats,"rep_Fig")
     fileName = paste0(format(Sys.time(), "%H%M%S"),"_",dist,"dist_",nb.move,"moves_",nbLeaves,"leaves_",nbRepeats,"rep")
   } else {  
-    dirNameFig = paste0("Benchmark_data/", format(Sys.time(), "%H%M%S"), nb.move,"moves_", nbRepeats,"rep_Fig")
+    dirNameFig = paste0("Benchmark_data/", format(Sys.time(), "%H%M%S"),"_", nb.move,"moves_", nbRepeats,"rep_Fig")
     fileName = paste0(format(Sys.time(), "%H%M%S"),"_",nb.move,"moves_",nbLeaves,"leaves_",nbRepeats,"rep")
   }
   
@@ -492,43 +501,56 @@ benchmark <- function(nbRepeats, nbLeaves, nb.move, phyType = "Normal", dist){
   
   return (metrics)
 }
-x = benchmark(nbRepeats = 20, nbLeaves = 40, nb.move = 5, dist = 5, phyType = "Alt")
 
-toRun = list(list(1, 10, 1,  "Alt", 3), 
-             list(1, 10, 2,  "Alt", 3))
-             #list(1, 10, 10, "Alt", 5))
-autre = list(1,2,3,4)
-  
-for (i in toRun){
-  print(class(i))
-  #do.call(benchmark, i)
-}
-
+# Parallélisation du benchmark
 bench_par <- function(arglist){
   
   Ncpus <- parallel::detectCores() - 2
   cl <- parallel::makeCluster(Ncpus)
   doParallel::registerDoParallel(cl)
   
-  foreach::foreach(i=1:length(arglist), 
+  res <- foreach::foreach(i=1:length(arglist), 
                    .export =c("benchmark", "createTaxPhyAlt", "mast", 
                               "treeMetrics", "edgesToDf"),
                    .packages = c("ape","RcppHungarian", 
                                  "stringr", "dplyr")) %dopar% {
-    pritn(paste0("Intance ", i))
-    return(do.call(what = benchmark, arglist[[i]]))
-  }
+                                   return(do.call(what = benchmark, arglist[[i]]))
+                                 }
   
   parallel::stopCluster(cl)
   return(res)
 }
 
+# Setup parallélistation ----
+toRun = list(list(200, 100, 10, "Alt", 4),
+             list(200, 100, 15, "Alt", 4),
+             list(200, 100, 20, "Alt", 4), 
+             list(200, 100, 25, "Alt", 4),
+             list(200, 100, 30, "Alt", 4),
+             list(200, 100, 1,  "Alt", 5), 
+             list(200, 100, 3,  "Alt", 5),
+             list(200, 100, 5,  "Alt", 5),
+             list(200, 100, 10, "Alt", 5),
+             list(200, 100, 15, "Alt", 5),
+             list(200, 100, 20, "Alt", 5), 
+             list(200, 100, 25, "Alt", 5),
+             list(200, 100, 30, "Alt", 5),
+             list(200, 100, 1,  "Alt", 7), 
+             list(200, 100, 3,  "Alt", 7),
+             list(200, 100, 5,  "Alt", 7),
+             list(200, 100, 10, "Alt", 7),
+             list(200, 100, 15, "Alt", 7),
+             list(200, 100, 20, "Alt", 7),
+             list(200, 100, 25, "Alt", 7),
+             list(200, 100, 30, "Alt", 7))
+               
+x = bench_par(toRun)
 
-node.height(random$taxo)
-plot(random$taxo)
+# Lancement manuel d'un benchmark ####
+x = benchmark(nbRepeats = 20, nbLeaves = 40, nb.move = 5, dist = 5, phyType = "Alt")
 
 # Lancement manuel d'une instance ####
-random = createTaxPhyAlt(nbLeaves = 20, nb.move = 2, dist = 5)
+random = createTaxPhy(nbLeaves = 10, nb.move = 2)
 
 Taxo = random$taxo
 Phylo = random$phylo
@@ -540,27 +562,49 @@ resultat = mast(subRootTax = Taxo$node.label[1], subRootPhy = Phylo$node.label[1
                 trees = list(Taxo,Phylo))
 
 # test zone ####
-test <- function (a,b){
-  if (a==b) {
-    return (print("aouioui"))
-  }
-  return (a+b)
+sumfun <- function(x, y, z){
+  return(x+y+z)
 }
-unique(matrix(c(1, 2, 3, 4, 5, 6, 1, 2, 3, 6, 5, 4), nrow = 3, ncol = 4), MARGIN = 2)
-df$edgeDist = list(c("bonjor","aurev"))
 
+test = list(list(200, 10, 4),
+            list(200, 15, 4),
+            list(200, 20, 4), 
+            list(200, 25, 4),
+            list(200, 30, 4),
+            list(200, 1,  5), 
+            list(200, 3,  5),
+            list(200, 5,  5),
+            list(200, 10, 5),
+            list(200, 15, 5),
+            list(200, 20, 5), 
+            list(200, 25, 5),
+            list(200, 30, 5),
+            list(200, 1,  7), 
+            list(200, 3,  7),
+            list(200, 5,  7),
+            list(200, 10, 7),
+            list(200, 15, 7),
+            list(200, 20, 7),
+            list(200, 25, 7),
+            list(200, 30, 7))
 
+par_test <- function(arglist){
+  
+  Ncpus <- parallel::detectCores() - 2
+  cl <- parallel::makeCluster(Ncpus)
+  doParallel::registerDoParallel(cl)
+  
+  res <- foreach::foreach(i=1:length(test), 
+                   .export =c("sumfun")) %dopar% {
+                     return(do.call(what = sumfun, test[[i]]))
+                   }
+  
+  parallel::stopCluster(cl)
+  return(print("bonjour"))
+}
 # Réservoir ####
-liste = c("abc", "de", "gklm")
-res = liste[which.max(lapply(liste, nchar))]
-
-base::setdiff(1:2)
-matrix = matrix(ncol =T2$Nnode , nrow = T1$Nnode,
-                dimnames = list(c(paste0("T1",T1$node.label),(c(paste0("T2",T2$node.label))))))
-
-test = c(paste0("T1",T1$node.label))
-T1$Nnode
-comparePhylo()
-T1$Nnode
-list(list(paste0("T1",T1$node.label),((paste0("T2",T2$node.label)))))
+for (i in toRun){
+  print(class(i))
+  do.call(benchmark, i)
+}
 
