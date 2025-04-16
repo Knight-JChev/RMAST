@@ -506,89 +506,16 @@ bench_par <- function(arglist){
 }
 
 # Setup parallélistation ----
-toRun = list(list(200, 100, 10, "Alt", 4),
-             list(200, 100, 15, "Alt", 4),
-             list(200, 100, 20, "Alt", 4), 
-             list(200, 100, 25, "Alt", 4),
-             list(200, 100, 30, "Alt", 4),
-             list(200, 100, 1,  "Alt", 5), 
-             list(200, 100, 3,  "Alt", 5),
-             list(200, 100, 5,  "Alt", 5),
-             list(200, 100, 10, "Alt", 5),
-             list(200, 100, 15, "Alt", 5),
-             list(200, 100, 20, "Alt", 5), 
-             list(200, 100, 25, "Alt", 5),
-             list(200, 100, 30, "Alt", 5),
-             list(200, 100, 1,  "Alt", 7), 
-             list(200, 100, 3,  "Alt", 7),
-             list(200, 100, 5,  "Alt", 7),
-             list(200, 100, 10, "Alt", 7),
-             list(200, 100, 15, "Alt", 7),
-             list(200, 100, 20, "Alt", 7),
-             list(200, 100, 25, "Alt", 7),
-             list(200, 100, 30, "Alt", 7))
-               
-x = bench_par(toRun)
+  ##toRun = list(list(200, 100, 10, "Alt", 4),
+  ##             list(200, 100, 15, "Alt", 4))
+  ##x = bench_par(toRun)
 
 # Lancement manuel d'un benchmark ####
-x = benchmark(nbRepeats = 30, nbLeaves = 15, nb.move = 1, dist = 3, phyType = "Alt")
+  ##x = benchmark(nbRepeats = 30, nbLeaves = 15, nb.move = 1, dist = 3, phyType = "Alt")
 
 # Lancement manuel d'une instance ####
-random = createTaxPhyAlt(nbLeaves = 6, nb.move = 1, dist = 3)
-
-Taxo = random$taxo
-Phylo = random$phylo
-doneMat = matrix(nrow = Taxo$Nnode, 
-                 ncol = Phylo$Nnode, 
-                 dimnames = list(Taxo$node.label, Phylo$node.label))
-
-resultat = mast(subRootTax = Taxo$node.label[1], subRootPhy = Phylo$node.label[1],
-                trees = list(Taxo,Phylo))
-
-# test zone ####
-sumfun <- function(x, y, z){
-  return(x+y+z)
-}
-
-test = list(list(200, 10, 4),
-            list(200, 15, 4),
-            list(200, 20, 4), 
-            list(200, 25, 4),
-            list(200, 30, 4),
-            list(200, 1,  5), 
-            list(200, 3,  5),
-            list(200, 5,  5),
-            list(200, 10, 5),
-            list(200, 15, 5),
-            list(200, 20, 5), 
-            list(200, 25, 5),
-            list(200, 30, 5),
-            list(200, 1,  7), 
-            list(200, 3,  7),
-            list(200, 5,  7),
-            list(200, 10, 7),
-            list(200, 15, 7),
-            list(200, 20, 7),
-            list(200, 25, 7),
-            list(200, 30, 7))
-
-par_test <- function(arglist){
-  
-  Ncpus <- parallel::detectCores() - 2
-  cl <- parallel::makeCluster(Ncpus)
-  doParallel::registerDoParallel(cl)
-  
-  res <- foreach::foreach(i=1:length(test), 
-                   .export =c("sumfun")) %dopar% {
-                     return(do.call(what = sumfun, test[[i]]))
-                   }
-  
-  parallel::stopCluster(cl)
-  return(print("bonjour"))
-}
-# Réservoir ####
-for (i in toRun){
-  print(class(i))
-  do.call(benchmark, i)
-}
-
+  ##random = createTaxPhyAlt(nbLeaves = 6, nb.move = 1, dist = 3)
+  ##Taxo = random$taxo
+  ##Phylo = random$phylo
+  ##doneMat = matrix(nrow = Taxo$Nnode, ncol = Phylo$Nnode, dimnames = list(Taxo$node.label, Phylo$node.label))
+  ##resultat = mast(subRootTax = Taxo$node.label[1], subRootPhy = Phylo$node.label[1], trees = list(Taxo,Phylo))
