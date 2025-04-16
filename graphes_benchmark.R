@@ -1,7 +1,7 @@
 library(ggplot2)
 library(dplyr)
 
-dir = "Benchmark_data/Data_20rep_40leaves_dist/"
+dir = "Benchmark_data/200rep_3a7dist_1a25moves/"
 metricsframe = data.frame()
 for (file in list.files(dir)){
   if (!(dir.exists(paste0(dir,file)))){
@@ -9,6 +9,9 @@ for (file in list.files(dir)){
     metricsframe = rbind(metricsframe, df)
   }
 }
+newmoves = c("1","3", "5", "10", "15", "20", "25")
+metricsframe2 = arrange(mutate(metricsframe, nb.move = factor(nb.move, levels = newmoves)), nb.move)
+
 # New plots random Tax ####
   ## Distribution des tailles d'arbres ----
   plot2 = ggplot(data = metricsframe) +
@@ -105,24 +108,28 @@ for (file in list.files(dir)){
 
 # New plots fixed dist ####
   ## Changer les labels pour les distances
-  dist.labs <- c("Dist 3", "Dist 4", "Dist 5")
-  names(dist.labs) <- c("3", "4", "5")
+  dist.labs <- c("Dist 3", "Dist 4", "Dist 5", "Dist 7")
+  names(dist.labs) <- c("3", "4", "5", "7")
   
   # Changer les labels pour le nb de feuilles
-  move.labs <- c("1 Leaf Moved", "5 Leaves Moved", "10 Leaves moved")
-  names(move.labs) <- c("1", "5", "10")
+  move.labs <- c("1 Leaf Moved", "3 Leaves Moved","5 Leaves Moved","10 Leaves Moved",
+                 "15 Leaves Moved", "20 Leaves moved", "25 Leaves Moved")
+  names(move.labs) <- c("1","3", "5", "10", "15", "20", "25")
   
   ## Nombre "d'erreurs" par arbre  ----
-  plot3b = ggplot(data = metricsframe) +
+  plot3b = ggplot(data = metricsframe2) +
     geom_bar(aes(x = factor(FN))) +
     facet_grid(dist~nb.move, labeller=labeller(dist = dist.labs, nb.move = move.labs)) +
     labs(title = "Nombre d'abre en fonction du nombre de FN" ,
          x = "Nombre de feuilles déplacées retenues",
-         y = "Nombre d'arbres observés")
+         y = "Nombre d'arbres observés")+
+    scale_x_discrete(labels= c("0","","","","","5","","","","","10",
+                               "","","","","15","","","","","20",
+                               "","","","","25"))
   plot3b
 
   ## Matrice de couleur
-  pamal = metricsframe %>% group_by(nbLeaves, nb.move, dist) %>%
+  pamal = metricsframe2 %>% group_by(nbLeaves, nb.move, dist) %>%
     count(perfect, FN) %>%
     reframe(matval = FN*n) %>%
     group_by(nbLeaves, nb.move, dist) %>%
@@ -147,7 +154,7 @@ for (file in list.files(dir)){
     scale_x_discrete(expand = c(0,0))
   
   ## Matrice de couleur "normalisée"
-  metricsframe %>% group_by(nbLeaves, nbRepeats, nb.move, dist) %>%
+  mieux = metricsframe2 %>% group_by(nbLeaves, nbRepeats, nb.move, dist) %>%
     count(perfect, FN) %>%
     reframe(matval = FN*n) %>%
     group_by(nbLeaves, nbRepeats, nb.move, dist) %>%
@@ -158,7 +165,7 @@ for (file in list.files(dir)){
     geom_tile() +
     geom_text(col = "rosybrown1") +
     scale_fill_viridis_c(begin = 0.2, end = 0.6, direction = -1, option = "plasma")+
-    labs (title = "Pourcentage d'erreurs retenues sur erreurs possibles",
+    labs (title = "Pourcentage : feuilles déplacées retenues sur feuilles déplacées",
           x = "Distance de déplacement",
           y = "Nombre de feuilles déplacées",
           subtitle = paste0("20 arbres de 40 feuilles par case"))+
@@ -173,7 +180,7 @@ for (file in list.files(dir)){
     scale_x_discrete(expand = c(0,0))
   
   ## Nombre d'erreurs par distance entre feuilles déplacées ----
-  tb = metricsframe %>% filter (FN >= 1) # Garder que les cas avec erreurs retenues
+  tb = metricsframe2 %>% filter (FN >= 1) # Garder que les cas avec erreurs retenues
   
   # Déplier le vecteur de distance pour le mettre dans un tableau
   plot5bframe = data.frame()
