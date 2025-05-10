@@ -4,7 +4,7 @@ library(stringr)
 library(RcppHungarian)
 # Fonction pour faire la phylo et la taxo.
 # Retourne un vecteur avec taxo, phylo, arbre d'origine
-createTaxPhy <- function(nbLeaves = 10, nb.move = 5, dist = 3, phyType = "Normal"){
+createTaxPhy <- function(nbLeaves = 10){
   world = rtree(nbLeaves+nb.move, rooted = FALSE)
   (q1 = summary(world$edge.length)[2])
   ttt = sample(1:length(world$tip.label), size = 2*nb.move, replace = F)
@@ -74,7 +74,7 @@ createTaxPhy <- function(nbLeaves = 10, nb.move = 5, dist = 3, phyType = "Normal
               edgeDist = edgeDist, realWrongTips = realWrongTips, wrongTips = wrongTips))
 }
 
-# Retourne un vecteur avec taxo, phylo, arbre d'origine
+# Prend en compte la distance de déplacement des feuilles
 createTaxPhyAlt <- function(nbLeaves = 10, nb.move = 2, dist = 4){
   
   # Vérif 
@@ -504,6 +504,27 @@ bench_par <- function(arglist){
   parallel::stopCluster(cl)
   return(res)
 }
+
+
+
+# Matrice d'enregistrement des résultats de mast en cours
+arbre1 = read.tree(text = "((7990KR701906,7992KJ473717,11894MT795184,18920KT375565,22559OR546136,26308MK978155,4556MH248251,3295LC549804)Nemipterus,4439AY484975)Eupercaria;0")
+arbre2= read.tree(text = "((26308MK978155:0.06042889,((11894MT795184:0.00958929,18920KT375565:0.00922456)0.981669:0.01934093,(7990KR701906:0.00000001,7992KJ473717:0.00000001)-1.000000:0.02026485)0.334856:0.00186894)0.334044:0.00724549,4556MH248251:0.00993826,(22559OR546136:0.08719328,(4439AY484975:0.00578967,3295LC549804:0.05351206)0.998239:0.04709670)0.662670:0.02002656);")
+
+arbre1[[6]] = "taxo"
+names(arbre1)[6] = "name"
+
+arbre2[[6]] = "phylo"
+names(arbre2)[6] = "name" 
+
+arbre2 = makeNodeLabel(arbre2, method ="number")
+
+.GlobalEnv$doneMat = matrix(nrow = arbre1$Nnode, 
+                              ncol = arbre2$Nnode, 
+                              dimnames = list(arbre1$node.label, arbre2$node.label))
+
+trees = c(arbre2, arbre1)
+mast(subRootTax = arbre1$node.label[1], subRootPhy = arbre2$node.label[1], trees = c(arbre2, arbre1))
 
 # Setup parallélistation ----
   ##toRun = list(list(200, 100, 10, "Alt", 4),
