@@ -1,6 +1,7 @@
 library(dplyr)
 library(ggplot2)
 library(stringr)
+library(tidyr)
 
 resdir ="/home/knight/Bureau/Rouen_M1/Stage_LECA/KAST/Results/"
 
@@ -62,7 +63,6 @@ all_clusters %>% dplyr::count(V1, barcode, similarity) %>%
   scale_x_log10()+
   scale_y_log10()
 
-
 # Density plot à réfléchir  
 all_clusters %>% dplyr::count(V1,barcode, similarity) %>%
   ggplot() + 
@@ -71,15 +71,106 @@ all_clusters %>% dplyr::count(V1,barcode, similarity) %>%
   labs(x = "Cluster size") +
   scale_x_log10()
 
+all_kast %>%
+  ggplot() +
+  facet_grid(.~barcode) +
+  geom_boxplot(aes(y = mast, x = similarity ))
+
 # Manipulation de tableaux ####
 # Nombre de clusters de taille < 20
 all_clusters %>%
   group_by(similarity, barcode) %>%
   count(V1, barcode, similarity, name = "count") %>%
-  filter(V1<20) %>%
+  filter(V1>20) %>%
   tally(count)
 
+# Kast et mast normalisés
+all_kast = all_kast %>% 
+  mutate(real_tree_size = if_else(tree_size>150, true =150, false = tree_size)) %>%
+  mutate(norm_mast = mast/real_tree_size) %>%
+  mutate(norm_kast = kast/real_tree_size)
+
 # Nombre de clusters analysés
-all_kast %>%
+counts = all_kast %>% 
   group_by(similarity, barcode) %>%
-  count(similarity, barcode)
+  tally(name = "count") %>%
+  mutate(count = paste0("n = ", count))
+
+# Garde le max du mast normalisé pour annotation figure
+pos_mast = all_kast %>% 
+  group_by(similarity, barcode) %>%
+  filter(norm_mast == max(norm_mast)) %>%
+  distinct(norm_mast) %>%
+  mutate(pos_mast = max(norm_mast)+0.05) %>%
+  select(similarity, barcode, pos_mast)
+
+# Garde le max du kast normalisé pour annotation figure + join les tableaux
+kast_mast_counts = all_kast %>% 
+  group_by(similarity, barcode) %>%
+  filter(norm_kast == max(norm_kast)) %>%
+  distinct(norm_kast) %>%
+  mutate(pos_kast = max(norm_kast)+0.03) %>%
+  select(similarity, barcode, pos_kast) %>%
+  left_join(pos_mast) %>%
+  left_join(counts)
+
+# Violin plots
+## Mast
+MASTplot = ggplot(all_kast) +
+  facet_grid(.~similarity) + 
+  geom_violin(aes(x = barcode, y = norm_mast, fill = barcode),
+              draw_quantiles = c(0.25,0.5,0.75), show.legend = F) +
+  geom_text(data = kast_mast_counts, aes(x = barcode, y = -0.15, label = count),
+            size=4)+
+  labs(x = "Barcode",
+       y = "MAST normalisé")+
+  theme_bw()+
+  coord_cartesian(ylim=c(0,0.8),
+                  clip = "off")+ # Don't crop text out of plot
+  theme(axis.title.x.bottom = element_blank(),
+        axis.ticks.length.x.bottom = unit(.2,"cm"),
+        axis.text.x = element_blank(),
+        plot.margin = unit(c(1,1,2,1), "lines"),
+        axis.text = element_text(size = 12 ),
+        axis.title = element_text(size = 14)) + #Widens margins
+  scale_fill_brewer(palette="Spectral")
+MASTplot
+
+KASTplot= ggplot(all_kast) +
+  facet_grid(.~similarity) + 
+  geom_violin(aes(x = barcode, y = norm_kast, fill = barcode),
+              draw_quantiles = c(0.25,0.5,0.75), show.legend = F) +
+   labs(x = "Barcode",
+       y = "KAST normalisé") +
+  theme_bw()+
+  coord_cartesian(ylim=c(0,0.8), clip="off")+
+  theme(strip.background = element_blank(),
+        strip.text.x = element_blank(),
+        plot.margin = unit(c(1,1,1,1), "lines"),
+        axis.text = element_text(size = 12 ),
+        axis.title = element_text(size = 14))+
+  scale_x_discrete(labels = c("Inse01","Sper01","Vert01"))+
+  scale_fill_brewer(palette="Spectral")+
+   annotation_ticks(sides="t", type = "major", outside = T,
+                    linewidth = 0.4)
+  KASTplot 
+
+ggarrange(MASTplot,NULL, KASTplot, ncol = 1, nrow = 3,
+          heights = c(1,-0.05,1))
+
+
+## Tests ####
+# Generate data
+df <- data.frame(y=c("cat1","cat2","cat3"),
+                 x=c(12,10,14),
+                 n=c(5,15,20))
+
+# Create the plot
+ggplot(df,aes(x=x,y=y,label=n)) +
+  geom_point()+
+  geom_text(y = I(4), # Set text's position to the right end of the plot
+            hjust = 0,
+            size = 8) +
+  coord_cartesian(xlim = c(10, 14), # This focuses the x-axis on the range of interest
+                  clip = 'off') +   # This keeps the labels from disappearing
+  theme(plot.margin = unit(c(1,3,1,1), "lines")) # This widens the right margin
