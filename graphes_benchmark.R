@@ -1,7 +1,7 @@
 library(ggplot2)
 library(dplyr)
 
-dir = "Benchmark_data/200rep_3a7dist_1a25moves/"
+dir = "Benchmark_data/"
 metricsframe = data.frame()
 for (file in list.files(dir)){
   if (!(dir.exists(paste0(dir,file)))){
@@ -11,100 +11,6 @@ for (file in list.files(dir)){
 }
 newmoves = c("1","3", "5", "10", "15", "20", "25")
 metricsframe2 = arrange(mutate(metricsframe, nb.move = factor(nb.move, levels = newmoves)), nb.move)
-
-# New plots random Tax ####
-  ## Distribution des tailles d'arbres ----
-  plot2 = ggplot(data = metricsframe) +
-    geom_dotplot(aes(x = nb.move, y = obsTreeSize), fill = metricsframe$perfect, 
-                 binwidth = 1, dotsize = 0.5, binaxis = "y",
-                 stackdir = "center", stackratio = 1.2) +
-    labs(title = "Distribution des tailles d'arbres" ,
-         x = "Nombre d'erreurs demandées",
-         y = "Taille observée de l'arbre") +
-    theme_bw() + theme(panel.grid.major = element_line(colour = "grey80", linewidth = 0.5),
-                       panel.grid.minor.y = element_line(colour = "grey", linewidth =0.2),
-                       panel.grid.major.y = element_line(colour = "grey", linewidth =0.5),
-                       panel.grid.minor.x=element_blank()) +
-    scale_y_continuous(minor_breaks = seq(15, 25, by = 1)) +
-    coord_cartesian(ylim = c(0,25))
-  plot2
-  
-  plot2b = ggplot(data = metricsframe) +
-    geom_dotplot(aes(x = nb.move, y = obsTreeSize, fill = perfect),
-                 binwidth = 1, dotsize = 0.5, binaxis = "y",
-                 stackdir = "center", stackratio = 1, position = "dodge") +
-    labs(title = "Distribution des tailles d'arbres" ,
-         x = "Nombre d'erreurs demandées",
-         y = "Taille observée de l'arbre") +
-    theme_bw() + theme(panel.grid.major = element_line(colour = "grey80", linewidth = 0.5),
-                       panel.grid.minor.y = element_line(colour = "grey", linewidth =0.2),
-                       panel.grid.major.y = element_line(colour = "grey", linewidth =0.5),
-                       panel.grid.minor.x=element_blank()) +
-    scale_y_continuous(minor_breaks = seq(15, 25, by = 1)) +
-    coord_cartesian(ylim = c(0,25))
-  plot2b
-  
-  
-  ## Nombre "d'erreurs" par arbre  ----
-  plot3 = ggplot(data = metricsframe) +
-    geom_bar(aes(x = factor(FN))) +
-    facet_grid(.~nb.move) +
-    labs(title = "Nombre d'abre en fonction du nombre de FN" ,
-         x = "Nombre de feuilles déplacées retenues",
-         y = "Nombre d'arbres observés")
-  plot3
-  
-  ## Créer un tableau temporaire en allongeant un vecteur en colonne
-  plot4frame = data.frame()
-  for (i in 1:nrow(metricsframe)){
-    tmp = data.frame()
-    for (j in 1:length(metricsframe$edgeDist[[i]])){
-      tmp[j,1] = metricsframe$id[i]
-      tmp[j,2] = metricsframe$nb.move[i]
-      tmp[j,3] = metricsframe$FN[i]
-      tmp[j,4] = metricsframe$edgeDist[[i]][j]
-    }
-    plot4frame = rbind(plot4frame, tmp)
-  }
-  colnames(plot4frame) <- c("id","nb.move","FN","edgeDist")
-  
-  plot4 = ggplot(data = plot4frame) +
-    geom_bar(aes(x = factor(FN), fill = factor(edgeDist))) +
-    facet_grid(.~nb.move) +
-    labs(title = "Branches entre feuilles déplacées, coloré par distance" ,
-         x = "Nombre de feuilles déplacées retenues",
-         y = "Nombre de branches entre les feuilles déplacées")
-  plot4
-  
-  ## ---------
-  t = metricsframe %>% filter (FN >= 1)
-  
-  plot5frame = data.frame()
-  for (i in 1:nrow(t)){
-    tmp = data.frame()
-    edgeofWrong = t$edgeDist[[i]][match(t$FNtips[[i]], t$wrongTips[[i]])]
-    
-    for (j in 1:length(edgeofWrong)){
-      tmp[j,1] = t$id[i]
-      tmp[j,2] = t$nb.move[i]
-      tmp[j,3] = t$FN[i]
-      tmp[j,4] = edgeofWrong[j]
-    }
-    plot5frame = rbind(plot5frame, tmp)
-  }
-  
-  colnames(plot5frame) <- c("id","nb.move","FN","edgeofWrong")
-  
-  plot5 = ggplot(data = plot5frame) +
-    geom_bar(aes(x = factor(FN), fill = factor(edgeofWrong))) +
-    facet_grid(.~nb.move) +
-    labs(title = "Nombre de 'mauvaises' branche, colorées par distance",
-         x = "Nombre de feuilles déplacées retenues",
-         y = "#branches des mauvaises feuilles retenues") +
-    theme(panel.grid.minor.y = element_blank(),
-          panel.grid.major.x = element_blank())+
-    scale_y_continuous(breaks = seq(1,10, by=1))
-  plot5
 
 # New plots fixed dist ####
   ## Changer les labels pour les distances
@@ -159,23 +65,32 @@ metricsframe2 = arrange(mutate(metricsframe, nb.move = factor(nb.move, levels = 
     reframe(matval = FN*n) %>%
     group_by(nbLeaves, nbRepeats, nb.move, dist) %>%
     tally(matval) %>%
-    mutate(normVal = n/(as.numeric(levels(nb.move)[nb.move])*nbRepeats))
+    mutate(normVal = round(n/(as.numeric(levels(nb.move)[nb.move])*nbRepeats), digits = 3)) %>%
+    mutate(compte_faux = paste0("n = ",n))
   
-  ggplot(mieux, aes(x = dist, y = nb.move, fill = normVal , label = normVal)) +
-    geom_tile() +
-    geom_text(col = "rosybrown1") +
+  ggplot(mieux) +
+    geom_tile(aes(x = dist, y = nb.move, fill = normVal)) +
+    geom_text(aes(x = dist, y = nb.move, label = normVal), col = "mistyrose", size = 6) +
+    geom_text(aes(x = dist, y = nb.move, label = compte_faux), col = "white", nudge_y = -0.3, size = 4) + 
     scale_fill_viridis_c(begin = 0.2, end = 0.6, direction = -1, option = "plasma")+
-    labs (title = "Pourcentage : feuilles déplacées retenues sur feuilles déplacées",
+    labs (title = "Proportion de feuilles déplacées retenues",
+          subtitle = paste0("200 arbres de 100 feuilles par case"),
           x = "Distance de déplacement",
           y = "Nombre de feuilles déplacées",
-          subtitle = paste0("20 arbres de 40 feuilles par case"))+
+          fill = "Proportion \n d'erreur")+
     theme_bw() + theme(panel.background = element_blank(),
                        panel.border = element_blank(),
                        panel.grid = element_blank(),
                        axis.title = element_text(color = "black", size = 12),
                        axis.ticks = element_line(),
                        axis.text = element_text(color = "black", size = 10, face = "bold"),
-                       axis.line = element_blank())+
+                       axis.line = element_blank(),
+                       plot.title=element_text(size=20),
+                       plot.subtitle=element_text(size=15),
+                       legend.text=element_text(size=12),
+                       legend.title = element_text(size = 12),
+                       axis.title.x = element_text(size=15),
+                       axis.title.y = element_text(size=15))+
     scale_y_discrete(expand = c(0,0)) +
     scale_x_discrete(expand = c(0,0))
   
@@ -213,17 +128,7 @@ metricsframe2 = arrange(mutate(metricsframe, nb.move = factor(nb.move, levels = 
   
 
 # Tests ####
-d <- ggplot(mpg, aes(fl))
-d + geom_bar()
 
-df <- data.frame(grp = c("A", "B"), fit = 4:5, se = 1:2)
-j <- ggplot(df, aes(grp, fit, ymin = fit - se, ymax = fit + se))
-
-f <- ggplot(mpg, aes(class, hwy))
-f + geom_dotplot(binaxis = "y", stackdir = "center") 
-
-g <- ggplot(diamonds, aes(cut, color))
-g + geom_count()
 
 #' *patchwork package pour les insets*
 n <- d + geom_bar(aes(fill = fl))
