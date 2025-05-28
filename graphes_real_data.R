@@ -2,6 +2,8 @@ library(dplyr)
 library(ggplot2)
 library(stringr)
 library(tidyr)
+library(ggprism)
+library(ggpubr)
 
 resdir ="/home/knight/Bureau/Rouen_M1/Stage_LECA/KAST/Results/"
 
@@ -46,44 +48,75 @@ for (file in kast_tables){
 # Conversion to factors
 all_clusters$similarity = as.factor(all_clusters$similarity)
 all_clusters$barcode = as.factor(all_clusters$barcode)
+all_clusters = tibble(all_clusters) %>% filter(!is.na(V1))
 
 all_kast$similarity = as.factor(all_kast$similarity)
 all_kast$barcode = as.factor(all_kast$barcode)
+all_kast = tibble(all_kast)
 
-# Plots ####
+# Manipulation tableaux clusters ####
+# Clusters > 20 seq
+tmp = all_clusters %>%
+  mutate(size = if_else(V1>=20, "Large cluster", "Small cluster")) %>%
+  group_by(similarity, barcode, size) %>%
+  summarise(nb_seq = sum(V1)) # Nb de séquences
+
+clusters_sizes = all_clusters %>%
+  mutate(size = if_else(V1>=20, "Large cluster", "Small cluster")) %>%
+  group_by(similarity, barcode, size) %>%
+  count(similarity, barcode, size, name="cluster_count") %>% # Nb de clusters
+  left_join(tmp) # Join les tables
+
 # Dot plot
 all_clusters %>% dplyr::count(V1, barcode, similarity) %>%
   ggplot() +
   facet_grid(barcode~similarity) +
-  geom_point(aes(x = V1, y = n, colour = similarity)) +
-  geom_vline(aes(xintercept = 20), colour = "red") +
-  geom_vline(aes(xintercept = 150), colour = "red") +
-  labs(x="Cluster size",
-       y = "Nombre d'observation") +
+  geom_point(aes(x = V1, y = n, colour = barcode)) +
+  geom_vline(aes(xintercept = 20), colour = "black", linetype = 2) +
+  labs(x="Taille du cluster",
+       y = "Nombre de clusters") +
+  theme_bw()+
+  theme(axis.title = element_text(size = 14),
+        axis.text = element_text(size = 9),
+        strip.text = element_text(face = 2)) +
+  coord_cartesian(ylim=c(1,1e+5))+
+  scale_color_brewer(palette = "Set2")+
   scale_x_log10()+
   scale_y_log10()
 
-# Density plot à réfléchir  
-all_clusters %>% dplyr::count(V1,barcode, similarity) %>%
-  ggplot() + 
-  facet_grid(barcode~.) +
-  geom_density(aes(x = V1, colour = similarity))+
-  labs(x = "Cluster size") +
-  scale_x_log10()
+# Autre plot pour voir les évolutions
+ggplot(clusters_sizes)+
+  geom_line(aes(x = as.numeric(similarity), y = nb_seq, colour = barcode),
+            linewidth = 1.5)+
+  facet_grid(size~barcode)+
+  labs(x = "Similarité",
+       y = "Nombre de séquences")+
+  theme_bw()+
+  theme(axis.title = element_text(size = 14),
+        axis.text = element_text(size = 9),
+        strip.text.y = element_text(size = 10),
+        strip.text = element_text(face = 2)) +
+  scale_x_continuous(breaks = c(0.85,0.9,0.95,0.99))+
+  scale_color_brewer(palette = "Set2")+
+  scale_y_log10()
 
-all_kast %>%
-  ggplot() +
-  facet_grid(.~barcode) +
-  geom_boxplot(aes(y = mast, x = similarity ))
 
-# Manipulation de tableaux ####
-# Nombre de clusters de taille < 20
-all_clusters %>%
-  group_by(similarity, barcode) %>%
-  count(V1, barcode, similarity, name = "count") %>%
-  filter(V1>20) %>%
-  tally(count)
+ggplot(clusters_sizes)+
+  geom_line(aes(x = as.numeric(similarity), y = cluster_count, colour = barcode),
+            linewidth = 1.5)+
+  facet_grid(size~barcode)+
+  labs(y = "Nombre de clusters",
+       x = "Similarité") +
+  theme_bw()+
+  theme(axis.title = element_text(size = 14),
+        axis.text = element_text(size = 9),
+        strip.text.y = element_text(size = 10),
+        strip.text = element_text(face = 2)) +
+  scale_x_continuous(breaks = c(0.85,0.9,0.95,0.99))+
+  scale_color_brewer(palette = "Set2")+
+  scale_y_log10()
 
+# KAST et MAST ####
 # Kast et mast normalisés
 all_kast = all_kast %>% 
   mutate(real_tree_size = if_else(tree_size>150, true =150, false = tree_size)) %>%
@@ -133,7 +166,7 @@ MASTplot = ggplot(all_kast) +
         plot.margin = unit(c(1,1,2,1), "lines"),
         axis.text = element_text(size = 12 ),
         axis.title = element_text(size = 14)) + #Widens margins
-  scale_fill_brewer(palette="Spectral")
+  scale_fill_brewer(palette="Set2")
 MASTplot
 
 KASTplot= ggplot(all_kast) +
@@ -150,7 +183,7 @@ KASTplot= ggplot(all_kast) +
         axis.text = element_text(size = 12 ),
         axis.title = element_text(size = 14))+
   scale_x_discrete(labels = c("Inse01","Sper01","Vert01"))+
-  scale_fill_brewer(palette="Spectral")+
+  scale_fill_brewer(palette="Set2")+
    annotation_ticks(sides="t", type = "major", outside = T,
                     linewidth = 0.4)
   KASTplot 
@@ -160,17 +193,3 @@ ggarrange(MASTplot,NULL, KASTplot, ncol = 1, nrow = 3,
 
 
 ## Tests ####
-# Generate data
-df <- data.frame(y=c("cat1","cat2","cat3"),
-                 x=c(12,10,14),
-                 n=c(5,15,20))
-
-# Create the plot
-ggplot(df,aes(x=x,y=y,label=n)) +
-  geom_point()+
-  geom_text(y = I(4), # Set text's position to the right end of the plot
-            hjust = 0,
-            size = 8) +
-  coord_cartesian(xlim = c(10, 14), # This focuses the x-axis on the range of interest
-                  clip = 'off') +   # This keeps the labels from disappearing
-  theme(plot.margin = unit(c(1,3,1,1), "lines")) # This widens the right margin
