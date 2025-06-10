@@ -101,27 +101,20 @@ createTaxPhyAlt <- function(nbLeaves = 10, nb.move = 2, dist = 4){
   i = 1
   if (nrow(tmpcoords) >= nb.move){ # Au moins autant de résultats que demandé
     while (i <= nb.move){
-        tipTo = append(tipTo, tmpcoords[i,1])
-        tipMoved = append(tipMoved, tmpcoords[i,2])
-        i = i+1
+      tipTo = append(tipTo, tmpcoords[i,1])
+      tipMoved = append(tipMoved, tmpcoords[i,2])
+      i = i+1
     }
   } else return(createTaxPhyAlt(nbLeaves, nb.move, dist)) # Sinon, relancer
-
+  
   # Formatage pour benchmark
+  tipsNumber = sub(".", "", taxo$tip.label)
   wrongTips = taxo$tip.label[tipMoved]
-
+  
   # Création arbre phylo ####
   #' [Visu taxo et phylo]
   par(xpd = TRUE) # Permettre à la légende de sortir du cadre de la figure
   taxo = makeNodeLabel(taxo, method = "number", prefix = "tax") 
-  
-  layout(matrix(c(1,2),1,2)) # Matrice pour tracer les plots
-  
-  # Plot arbre taxo avec les bons nom
-  plot(taxo, cex = 1, main = "Taxo", font = 2)
-  nodelabels(taxo$node.label, adj = c(1,-0.2), frame = "n", cex = 0.8, font = 2, col="red")
-  tiplabels(taxo$tip.label[tipTo], tipTo, adj=0, font = 2, cex = 1, bg = "mediumpurple1")
-  tiplabels(wrongTips, tipMoved, adj=0, bg = "lightblue", font = 2, cex = 1)
   
   # Création arbre phylo
   phylo = taxo
@@ -139,24 +132,56 @@ createTaxPhyAlt <- function(nbLeaves = 10, nb.move = 2, dist = 4){
   # Plot arbre phylo
   tipMovedTo = match(taxo$tip.label[tipMoved], phylo$tip.label)
   phylo = makeNodeLabel(phylo, method = "number", prefix = "phy")
-  plot(phylo, main = "Phylo", cex = 1, font = 2)
-  nodelabels(phylo$node.label, adj = c(1,-0.2), frame = "n", cex = 0.8, font = 2, col="red")
-  tiplabels(taxo$tip.label[tipTo], tipToAdjust, adj=0, bg = "mediumpurple1", font = 2, cex = 1)
-  tiplabels(taxo$tip.label[tipMoved], tipMovedTo, adj=0, bg = "lightblue", font = 2, cex = 1)
+  
+  # Nombre d'arrêtes entre les paires de feuilles déplacées ####
+  edgeDist = c()
+  notWrongTips = c()
+  wrongTips = sub(".","",wrongTips)
+  
+  for (i in 1:nb.move) {
+    edges = (length(nodepath(taxo, tipMoved[i], tipTo[i])))-1
+    if (edges == 2) {
+      notWrongTips = append(notWrongTips, tipsNumber[tipMoved[i]])
+    }
+    edgeDist = append(edgeDist, edges)
+  }
+  
+  if (!(identical(pmatch(notWrongTips, wrongTips), integer(0)))){
+    realWrongTips = wrongTips[-pmatch(notWrongTips, wrongTips)]
+  } else realWrongTips = wrongTips
   
   
-  
-  # Noms pour arbres ####
   taxo[[6]] = "taxo"
   names(taxo)[6] = "name"
   
   phylo[[6]] = "phylo"
   names(phylo)[6] = "name"
   
-  # Return adapté au déplacement fixé ####
-  return(list(taxo = taxo, phylo = phylo, truth = c(taxo$tip.label[-c(tipMoved)]), edgeDist = dist, 
-              realWrongTips = wrongTips, wrongTips = wrongTips, notWrongTips = taxo$tip.label[tipTo]))
+  taxPhy = list(taxo = taxo, phylo = phylo, 
+                notWrongTips = notWrongTips, tipMoved = tipMoved, tipMovedTo = tipMovedTo,
+                tipTo=tipTo, tipToAdjust = tipToAdjust,
+                edgeDist = edgeDist, realWrongTips = realWrongTips)
+  plotChange(TaxPhy = taxPhy) # Plot both trees
+  
+  return()
 }
+plotChange <- function(TaxPhy){
+  layout(matrix(c(1,2),1,2)) # Matrice pour tracer les plots
+  
+  # Plot arbre taxo avec les bons nom
+  plot(TaxPhy$taxo, cex = 1, font = 2)
+  tiplabels(TaxPhy$taxo$tip.label[TaxPhy$tipTo], TaxPhy$tipTo, frame = "r",
+            adj=0, font = 2, cex = 1, bg = "mediumpurple1")
+  tiplabels(TaxPhy$taxo$tip.label[TaxPhy$tipMoved], TaxPhy$tipMoved, frame = "r",
+            adj=0, bg = "lightblue", font = 2, cex = 1)
+  
+  # Plot arbre phylo
+  plot(TaxPhy$phylo, cex = 1, font = 2)
+  tiplabels(TaxPhy$taxo$tip.label[TaxPhy$tipTo], TaxPhy$tipToAdjust, frame = "r",
+            adj=0, bg = "mediumpurple1", font = 2, cex = 1)
+  tiplabels(TaxPhy$taxo$tip.label[TaxPhy$tipMoved], TaxPhy$tipMovedTo,
+            adj=0, frame = "r", bg = "lightblue", font = 2, cex = 1)
+} # Plot un TaxPhyAlt
 
 # Faire une dataframe avec le nom des feuilles et noeuds
 edgesToDf <- function(tree){
@@ -504,7 +529,6 @@ arbrePhy = makeNodeLabel(arbrePhy, method ="number")
                               dimnames = list(arbreTax$node.label, arbrePhy$node.label))
 
 mast(taxo = arbreTax, phylo = arbrePhy, subRootTax = arbreTax$node.label[1], subRootPhy = arbrePhy$node.label[1])
-
 # Setup parallélistation ----
   toRun = list(list(200, 100, 1, "Alt", 3),
                list(200, 100, 3, "Alt", 3),
