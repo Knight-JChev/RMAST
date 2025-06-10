@@ -74,7 +74,7 @@ createTaxPhy <- function(nbLeaves = 10, nb.move = 3){
 }
 
 # Prend en compte la distance de déplacement des feuilles
-createTaxPhyAlt <- function(nbLeaves = 10, nb.move = 2, dist = 4){
+createTaxPhyAlt <- function(nbLeaves = 100, nb.move = 2, dist = 3){
   
   # Vérif 
   if (dist <= 2 || dist > nbLeaves/2){
@@ -100,6 +100,7 @@ createTaxPhyAlt <- function(nbLeaves = 10, nb.move = 2, dist = 4){
   tipTo = c()
   i = 1
   if (nrow(tmpcoords) >= nb.move){ # Au moins autant de résultats que demandé
+    tmpcoords = slice_sample(tmpcoords, n = nb.move) # Extraits des lignes aléatoires
     while (i <= nb.move){
       tipTo = append(tipTo, tmpcoords[i,1])
       tipMoved = append(tipMoved, tmpcoords[i,2])
@@ -163,7 +164,7 @@ createTaxPhyAlt <- function(nbLeaves = 10, nb.move = 2, dist = 4){
                 edgeDist = edgeDist, realWrongTips = realWrongTips)
   plotChange(TaxPhy = taxPhy) # Plot both trees
   
-  return()
+  return(taxPhy)
 }
 plotChange <- function(TaxPhy){
   layout(matrix(c(1,2),1,2)) # Matrice pour tracer les plots
@@ -508,7 +509,7 @@ bench_par <- function(arglist){
   
   res <- foreach::foreach(i=1:length(arglist), 
                    .export =c("benchmark", "createTaxPhyAlt", "mast", 
-                              "treeMetrics", "edgesToDf", "findBest"),
+                              "treeMetrics", "edgesToDf", "findBest", "plotChange"),
                    .packages = c("ape","RcppHungarian", 
                                  "stringr", "dplyr")) %dopar% {
                                    return(do.call(what = benchmark, arglist[[i]]))
