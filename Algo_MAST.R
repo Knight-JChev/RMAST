@@ -98,11 +98,13 @@ createTaxPhyAlt <- function(nbLeaves = 100, nb.move = 2, dist = 3){
   # Choix de le feuille à déplacer et de la feuille où déplacer
   tipMoved = c()
   tipTo = c()
+  tipToNames = c()
   i = 1
   if (nrow(tmpcoords) >= nb.move){ # Au moins autant de résultats que demandé
     tmpcoords = slice_sample(tmpcoords, n = nb.move) # Extraits des lignes aléatoires
     while (i <= nb.move){
       tipTo = append(tipTo, tmpcoords[i,1])
+      tipToNames = append(tipToNames, taxo$tip.label[tipTo[i]])
       tipMoved = append(tipMoved, tmpcoords[i,2])
       i = i+1
     }
@@ -124,10 +126,11 @@ createTaxPhyAlt <- function(nbLeaves = 100, nb.move = 2, dist = 3){
     # Ajuste l'indice des feuilles dans phylo comme on en enlève une par une
     tmptree = keep.tip(taxo, taxo$tip.label[tipMoved[i]])
     phylo = drop.tip(phylo, taxo$tip.label[tipMoved[i]])
-    tipToAdjust = append(tipToAdjust,
-                         which(phylo$tip.label == taxo$tip.label[tipTo[i]])) 
-    phylo = bind.tree(phylo, tmptree, where = tipToAdjust[i], position =  0.5)
+    phylo = bind.tree(phylo, tmptree, position =  0.5,
+                      where = which(phylo$tip.label == taxo$tip.label[tipTo[i]]))
   }
+  
+  tipToAdjust = match(taxo$tip.label[tipTo], phylo$tip.label) # Nouveaux indices
   phylo$edge.length[] <- 1
   
   # Plot arbre phylo
@@ -159,9 +162,10 @@ createTaxPhyAlt <- function(nbLeaves = 100, nb.move = 2, dist = 3){
   names(phylo)[6] = "name"
   
   taxPhy = list(taxo = taxo, phylo = phylo, 
-                notWrongTips = notWrongTips, tipMoved = tipMoved, tipMovedTo = tipMovedTo,
-                tipTo=tipTo, tipToAdjust = tipToAdjust,
-                edgeDist = edgeDist, realWrongTips = realWrongTips)
+                notWrongTips = notWrongTips, tipMoved = tipMoved,
+                tipMovedTo = tipMovedTo,tipTo=tipTo, 
+                tipToAdjust = tipToAdjust, edgeDist = edgeDist, 
+                realWrongTips = random$realWrongTips)
   plotChange(TaxPhy = taxPhy) # Plot both trees
   
   return(taxPhy)
@@ -175,6 +179,8 @@ plotChange <- function(TaxPhy){
             adj=0, font = 2, cex = 1, bg = "mediumpurple1")
   tiplabels(TaxPhy$taxo$tip.label[TaxPhy$tipMoved], TaxPhy$tipMoved, frame = "r",
             adj=0, bg = "lightblue", font = 2, cex = 1)
+  nodelabels(TaxPhy$taxo$node.label, adj = c(1,-0.2), frame = "n", cex = 0.8, font = 2, col="red")
+  
   
   # Plot arbre phylo
   plot(TaxPhy$phylo, cex = 1, font = 2)
@@ -182,7 +188,10 @@ plotChange <- function(TaxPhy){
             adj=0, bg = "mediumpurple1", font = 2, cex = 1)
   tiplabels(TaxPhy$taxo$tip.label[TaxPhy$tipMoved], TaxPhy$tipMovedTo,
             adj=0, frame = "r", bg = "lightblue", font = 2, cex = 1)
+  nodelabels(TaxPhy$phylo$node.label, adj = c(1,-0.2), frame = "n", cex = 0.8, font = 2, col="red")
+  
 } # Plot un TaxPhyAlt
+random = createTaxPhyAlt(nbLeaves = 20, nb.move = 5, dist = 3)
 
 # Faire une dataframe avec le nom des feuilles et noeuds
 edgesToDf <- function(tree){
