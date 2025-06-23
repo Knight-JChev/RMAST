@@ -4,7 +4,6 @@ library(stringr)
 library(tidyr)
 library(ggprism)
 library(ggpubr)
-
 resdir ="/home/knight/Bureau/Rouen_M1/Stage_LECA/KAST/Results/"
 
 # Vecteur de seuils de similarités
@@ -57,12 +56,12 @@ all_kast = tibble(all_kast)
 # Manipulation tableaux clusters ####
 # Clusters > 20 seq
 tmp = all_clusters %>%
-  mutate(size = if_else(V1>=20, "Large cluster", "Small cluster")) %>%
+  mutate(size = if_else(V1>=20, "Grands cluster", "Petits cluster")) %>%
   group_by(similarity, barcode, size) %>%
   summarise(nb_seq = sum(V1)) # Nb de séquences
 
 clusters_sizes = all_clusters %>%
-  mutate(size = if_else(V1>=20, "Large cluster", "Small cluster")) %>%
+  mutate(size = if_else(V1>=20, "Grands cluster", "Petits cluster")) %>%
   group_by(similarity, barcode, size) %>%
   count(similarity, barcode, size, name="cluster_count") %>% # Nb de clusters
   left_join(tmp) # Join les tables
@@ -71,14 +70,20 @@ clusters_sizes = all_clusters %>%
 all_clusters %>% dplyr::count(V1, barcode, similarity) %>%
   ggplot() +
   facet_grid(barcode~similarity) +
-  geom_point(aes(x = V1, y = n, colour = barcode)) +
+  geom_point(aes(x = V1, y = n, colour = barcode), show.legend = T) +
   geom_vline(aes(xintercept = 20), colour = "black", linetype = 2) +
+  geom_text(data = clusters_sizes %>% filter(size=="Grands cluster"), aes(x=100, y = 50000, label = cluster_count)) +
+  geom_text(data = clusters_sizes %>% filter(size=="Petits cluster"), aes(x=4.5, y = 50000, label = cluster_count)) + 
   labs(x="Taille du cluster",
-       y = "Nombre de clusters") +
+       y = "Nombre de clusters",
+       subtitle = "Niveau de similarité", colour = "Barcode") +
   theme_bw()+
-  theme(axis.title = element_text(size = 14),
+  theme(axis.title = element_text(size = 12),
         axis.text = element_text(size = 9),
-        strip.text = element_text(face = 2)) +
+        strip.text = element_text(face = 2),
+        plot.subtitle = element_text(hjust = 0.5, size = 12),
+        legend.title = element_text(size = 12),
+        legend.text = element_text(size = 10)) +
   coord_cartesian(ylim=c(1,1e+5))+
   scale_color_brewer(palette = "Set2")+
   scale_x_log10()+
@@ -100,7 +105,6 @@ ggplot(clusters_sizes)+
   scale_color_brewer(palette = "Set2")+
   scale_y_log10()
 
-
 ggplot(clusters_sizes)+
   geom_line(aes(x = as.numeric(similarity), y = cluster_count, colour = barcode),
             linewidth = 1.5)+
@@ -112,7 +116,7 @@ ggplot(clusters_sizes)+
         axis.text = element_text(size = 9),
         strip.text.y = element_text(size = 10),
         strip.text = element_text(face = 2)) +
-  scale_x_continuous(breaks = c(0.85,0.9,0.95,0.99))+
+  scale_x_discrete()+
   scale_color_brewer(palette = "Set2")+
   scale_y_log10()
 
@@ -165,6 +169,7 @@ MASTplot = ggplot(all_kast) +
         axis.text.x = element_blank(),
         plot.margin = unit(c(1,1,2,1), "lines"),
         axis.text = element_text(size = 12 ),
+        strip.text = element_text(face = 2),
         axis.title = element_text(size = 14)) + #Widens margins
   scale_fill_brewer(palette="Set2")
 MASTplot
