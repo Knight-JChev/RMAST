@@ -446,18 +446,16 @@ mast <- function(taxo, phylo, subRootTax = "none", subRootPhy = "none"){ #On gar
 }
 
 # Benchmark sur des arbres aléatoires
-benchmark <- function(nbRepeats, nbLeaves, nb.move, phyType = "Normal", dist){
+benchmark <- function(nbRepeats, nbLeaves, nb.move, phyType = "Alt", dist){
   # Dossiers et fichiers de stockage
   time = format(Sys.time(), "%H%M%S")
   if (phyType == "Alt"){
-    dirNameFig = paste0("Benchmark_data/", dist,"dist_",nb.move,"moves_",nbRepeats,"rep_Fig_",time)
     fileName = paste0(dist,"dist_",nb.move,"moves_",nbLeaves,"leaves_",nbRepeats,"rep_",time)
   } else {  
-    dirNameFig = paste0("Benchmark_data/",  nb.move,"moves_", nbRepeats,"rep_Fig_",time)
     fileName = paste0(nb.move,"moves_",nbLeaves,"leaves_",nbRepeats,"rep_",time)
   }
   
-  ifelse(!dir.exists(file.path(dirNameFig)), dir.create(file.path(dirNameFig)), "Figure Directory already exists")
+  ifelse(!dir.exists(file.path("./Benchmark_data")), dir.create(file.path("./Benchmark_data")), "Benchmark Directory already exists")
 
   # Variable de stockage des résultats
   metrics = data.frame() 
@@ -468,12 +466,10 @@ benchmark <- function(nbRepeats, nbLeaves, nb.move, phyType = "Normal", dist){
   for (rep in 1:nbRepeats){
     
     # Création + sauvegarde des arbres aléatoires avec feuilles déplacées
-    png(filename = paste0(dirNameFig,"/",fileName,"_",rep), width = 1920, height = 1080)
     if (phyType == "Alt"){
-      random = createTaxPhyAlt(nbLeaves = nbLeaves, nb.move = nb.move, dist = dist)
+      random = createTaxPhyAlt(nbLeaves = nbLeaves, nb.move = nb.move, dist = dist, plot = F)
     } else  random = createTaxPhy(nbLeaves = nbLeaves, nb.move = nb.move)
-    dev.off()
-    
+
     Taxo = random$taxo
     Phylo = random$phylo
 
@@ -564,6 +560,7 @@ test_mast <- function(nbLeaves = 20, nb.move = 2, dist = 4, plot = T){
 test_mast()
 
 # Lancement manuel d'un benchmark ####
+#' 
 x = benchmark(nbRepeats = 30, nbLeaves = 20, nb.move = 1, dist = 3, phyType = "Alt")
 
 
