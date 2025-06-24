@@ -563,6 +563,30 @@ test_mast <- function(nbLeaves = 20, nb.move = 2, dist = 4, plot = T){
 }
 test_mast()
 
+# Lancement manuel d'un benchmark ####
+x = benchmark(nbRepeats = 30, nbLeaves = 20, nb.move = 1, dist = 3, phyType = "Alt")
+
+
+
+# Parallélisation du benchmark
+bench_par <- function(arglist){
+  
+  Ncpus <- parallel::detectCores() - 2
+  cl <- parallel::makeCluster(Ncpus)
+  doParallel::registerDoParallel(cl)
+  
+  res <- foreach::foreach(i=1:length(arglist), 
+                          .export =c("benchmark", "createTaxPhyAlt", "mast", 
+                                     "treeMetrics", "edgesToDf", "findBest"),
+                          .packages = c("ape","RcppHungarian", 
+                                        "stringr", "dplyr")) %dopar% {
+                                          return(do.call(what = benchmark, arglist[[i]]))
+                                        }
+  
+  parallel::stopCluster(cl)
+  return(res)
+}
+
 # Setup parallélistation ----
   toRun = list(list(200, 100, 1, "Alt", 3),
                list(200, 100, 3, "Alt", 3),
@@ -574,15 +598,6 @@ test_mast()
 
   x = bench_par(toRun)
 
-# Lancement manuel d'un benchmark ####
-  x = benchmark(nbRepeats = 30, nbLeaves = 20, nb.move = 1, dist = 3, phyType = "Alt")
 
-# Lancement manuel d'une instance ####
-  random = createTaxPhyAlt(nbLeaves = 6, nb.move = 1, dist = 3)
-  Taxo = random$taxo
-  Phylo = random$phylo
-  doneMat = matrix(nrow = Taxo$Nnode, ncol = Phylo$Nnode, dimnames = list(Taxo$node.label, Phylo$node.label))
-  resultat = mast(taxo = Taxo, phylo = Phylo ,subRootTax = Taxo$node.label[1], subRootPhy = Phylo$node.label[1])
-  gsub("NA,*|,*NA", "","1,2,NA")
   
        
