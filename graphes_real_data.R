@@ -4,6 +4,7 @@ library(stringr)
 library(tidyr)
 library(ggprism)
 library(ggpubr)
+library(ggsignif)
 resdir ="/home/knight/Bureau/Rouen_M1/Stage_LECA/KAST/Results/"
 
 # Vecteur de seuils de similarités
@@ -171,7 +172,9 @@ MASTplot = ggplot(all_kast) +
         axis.text = element_text(size = 12 ),
         strip.text = element_text(face = 2),
         axis.title = element_text(size = 14)) + #Widens margins
-  scale_fill_brewer(palette="Set2")
+  scale_fill_brewer(palette="Set2") +
+  coord_cartesian(ylim = c(0,1))+
+  geom_signif(aes(x = barcode, y = norm_mast), comparisons = list(c("Vert01_0","Sper01")))
 MASTplot
 
 KASTplot= ggplot(all_kast) +
@@ -198,3 +201,4 @@ ggarrange(MASTplot,NULL, KASTplot, ncol = 1, nrow = 3,
 
 
 ## Tests ####
+

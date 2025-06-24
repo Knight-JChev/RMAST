@@ -218,14 +218,14 @@ tiplabels(b$tip.label[c(5,1)], tip = c(5,1), frame = "c", cex = 1.2, font = 2,
           srt = 90, bg = c("olivedrab3","springgreen4"), col = c("black","grey90"))
 
 # Exemple arbre et tableau ####
-layout(matrix(c(1),1,1))
+layout(matrix(c(1,2),1,2))
 a = stree(4, "b", tip.label = c(1,2,3,4))
 a$edge.length = rep(1, length(a$tip.label)*2-2)
 a$node.label = c(5,6,7)
 
-plot.phylo(a, "c", show.node.label = F, show.tip.label = F)
-tiplabels(a$tip.label, cex = 1.5, frame = "c", col = "black", bg = "coral1" , srt=90)
-nodelabels(a$node.label, frame = "c", cex = 1.5, font = 2, col="black", bg = "aquamarine", srt = 90)
+plot.phylo(a, "c", show.node.label = F, show.tip.label = F, direction = "downwards")
+tiplabels(a$tip.label, cex = 1.5, frame = "c", col = "black", bg = "coral1" )
+nodelabels(a$node.label, frame = "c", cex = 1.5, font = 2, col="black", bg = "aquamarine")
 
 # Oui ####
 x = rtree(12)

@@ -74,14 +74,26 @@ createTaxPhy <- function(nbLeaves = 10, nb.move = 3){
 }
 
 # Prend en compte la distance de déplacement des feuilles
-createTaxPhyAlt <- function(nbLeaves = 100, nb.move = 2, dist = 3){
+createTaxPhyAlt <- function(nbLeaves = 100, nb.move = 2, dist = 3, plot = T, in.taxo = "none"){
   
   # Vérif 
   if (dist <= 2 || dist > nbLeaves/2){
     return(print("Argument 'dist', has to be between 2 and half the number of leaves"))
   }
-  # Création de l'arbre taxo
-  taxo = rtree(nbLeaves, rooted = FALSE)
+  if (nb.move > nbLeaves) {
+    return(print("'nb.move' > 'nbLeaves', has to be "))
+  }
+  if (nb.move/nbLeaves > 0.2) {
+    print("WARNING : 'nb.move' > 20% of total tree leaves, you may run in a stack overflow.")
+  }
+  
+  # Création de l'arbre taxo s'il n'est pas fourni
+  if (is.character(in.taxo)){ 
+    taxo = rtree(nbLeaves, rooted = FALSE)
+  } else {
+    taxo = in.taxo
+  }
+  
   taxo$edge.length[] <- 1 # Toutes les arrêtes font 1 de long
   
   # Matrice de distance et choix des feuilles ####
@@ -108,15 +120,19 @@ createTaxPhyAlt <- function(nbLeaves = 100, nb.move = 2, dist = 3){
       tipMoved = append(tipMoved, tmpcoords[i,2])
       i = i+1
     }
-  } else return(createTaxPhyAlt(nbLeaves, nb.move, dist)) # Sinon, relancer
+  } else {
+    if (is.character(in.taxo)) {
+      return(createTaxPhyAlt(nbLeaves, nb.move, dist, plot)) # Sinon, relancer
+    } else {
+      return("Tree not adequate") # Ou retourner une string
+    }
+  }
   
   # Formatage pour benchmark
-  tipsNumber = sub(".", "", taxo$tip.label)
   wrongTips = taxo$tip.label[tipMoved]
   
   # Création arbre phylo ####
   #' [Visu taxo et phylo]
-  par(xpd = TRUE) # Permettre à la légende de sortir du cadre de la figure
   taxo = makeNodeLabel(taxo, method = "number", prefix = "tax") 
   
   # Création arbre phylo
@@ -140,12 +156,11 @@ createTaxPhyAlt <- function(nbLeaves = 100, nb.move = 2, dist = 3){
   # Nombre d'arrêtes entre les paires de feuilles déplacées ####
   edgeDist = c()
   notWrongTips = c()
-  wrongTips = sub(".","",wrongTips)
   
   for (i in 1:nb.move) {
     edges = (length(nodepath(taxo, tipMoved[i], tipTo[i])))-1
     if (edges == 2) {
-      notWrongTips = append(notWrongTips, tipsNumber[tipMoved[i]])
+      notWrongTips = append(notWrongTips, taxo$tip.label[tipMoved[i]])
     }
     edgeDist = append(edgeDist, edges)
   }
@@ -163,35 +178,57 @@ createTaxPhyAlt <- function(nbLeaves = 100, nb.move = 2, dist = 3){
   
   taxPhy = list(taxo = taxo, phylo = phylo, 
                 notWrongTips = notWrongTips, tipMoved = tipMoved,
-                tipMovedTo = tipMovedTo,tipTo=tipTo, 
+                tipMovedTo = tipMovedTo,tipTo=tipTo, tipToNames = tipToNames,
                 tipToAdjust = tipToAdjust, edgeDist = edgeDist, 
-                realWrongTips = random$realWrongTips)
-  plotChange(TaxPhy = taxPhy) # Plot both trees
+                realWrongTips = realWrongTips)
+  
+  if (plot == TRUE) plotTaxPhy(taxPhy) # Plot both trees
   
   return(taxPhy)
 }
-plotChange <- function(TaxPhy){
+plotPhy <- function(taxPhy, phy, corr = F, corrTree = "phylo"){
+  # Adapter selon les arguments
+  if (corr == F) {
+    plot(taxPhy[[phy]], cex = 1, font = 2)
+    nodePos = c(1,-0.2)
+    nodeCol = "red"
+  } else {
+    plotBranchbyTrait(taxPhy[[phy]], diagCorr(taxPhy, tree1 = corrTree, tree2 = phy)$corLeaves,
+                      mode = "tips", cex = 1, font = 2, title = "Corrélation",
+                      digits = 3)
+    nodePos = c(1.3,-0.4)
+    nodeCol = "darkolivegreen"
+  }
+  # Mettre en valeur les feuilles déplacées et les feuilles "cibles"
+  tiplabels(taxPhy$taxo$tip.label[taxPhy$tipTo], taxPhy$tipToAdjust, frame = "r",
+            adj=0, bg = "mediumpurple1", font = 2, cex = 1)
+  tiplabels(taxPhy$taxo$tip.label[taxPhy$tipMoved], taxPhy$tipMovedTo,
+            adj=0, frame = "r", bg = "lightblue", font = 2, cex = 1)
+  nodelabels(taxPhy[[phy]]$node.label, adj = nodePos, frame = "n", 
+             cex = 0.8, font = 2, col=nodeCol)
+} # Plot la Phylo
+plotTaxPhy <- function(taxPhy, taxo = "taxo", phy = "phylo", corr = F){
+  par(xpd = TRUE) # Permettre à la légende de sortir un peu
   layout(matrix(c(1,2),1,2)) # Matrice pour tracer les plots
+  if (phy != "phylo") layout(matrix(c(1,2,3),1,3))
   
   # Plot arbre taxo avec les bons nom
-  plot(TaxPhy$taxo, cex = 1, font = 2)
-  tiplabels(TaxPhy$taxo$tip.label[TaxPhy$tipTo], TaxPhy$tipTo, frame = "r",
+  plot(taxPhy$taxo, cex = 1, font = 2)
+  tiplabels(taxPhy$taxo$tip.label[taxPhy$tipTo], taxPhy$tipTo, frame = "r",
             adj=0, font = 2, cex = 1, bg = "mediumpurple1")
-  tiplabels(TaxPhy$taxo$tip.label[TaxPhy$tipMoved], TaxPhy$tipMoved, frame = "r",
+  tiplabels(taxPhy$taxo$tip.label[taxPhy$tipMoved], taxPhy$tipMoved, frame = "r",
             adj=0, bg = "lightblue", font = 2, cex = 1)
-  nodelabels(TaxPhy$taxo$node.label, adj = c(1,-0.2), frame = "n", cex = 0.8, font = 2, col="red")
+  nodelabels(taxPhy$taxo$node.label, adj = c(1,-0.2), frame = "n", cex = 0.8, font = 2, col="red")
   
+  plotPhy(taxPhy, phy = "phylo")
   
-  # Plot arbre phylo
-  plot(TaxPhy$phylo, cex = 1, font = 2)
-  tiplabels(TaxPhy$taxo$tip.label[TaxPhy$tipTo], TaxPhy$tipToAdjust, frame = "r",
-            adj=0, bg = "mediumpurple1", font = 2, cex = 1)
-  tiplabels(TaxPhy$taxo$tip.label[TaxPhy$tipMoved], TaxPhy$tipMovedTo,
-            adj=0, frame = "r", bg = "lightblue", font = 2, cex = 1)
-  nodelabels(TaxPhy$phylo$node.label, adj = c(1,-0.2), frame = "n", cex = 0.8, font = 2, col="red")
-  
+  # Mettre à jour la position des feuilles si la phylo n'est pas l'originale
+  if (phy != "phylo" ){
+    taxPhy$tipMovedTo = match(taxPhy$realWrongTips, taxPhy[[phy]]$tip.label)
+    taxPhy$tipToAdjust = match(taxPhy$tipToNames, taxPhy[[phy]]$tip.label)
+    plotPhy(taxPhy, phy = phy, corr = corr)
+  }
 } # Plot un TaxPhyAlt
-random = createTaxPhyAlt(nbLeaves = 20, nb.move = 5, dist = 3)
 
 # Faire une dataframe avec le nom des feuilles et noeuds
 edgesToDf <- function(tree){
@@ -244,9 +281,10 @@ findBest <- function(hitlist) {
 }
 
 # Maximum agreement subtree
-mast <- function(taxo, phylo, subRootTax, subRootPhy){ #On garde les arbres d'origine
+mast <- function(taxo, phylo, subRootTax = "none", subRootPhy = "none"){ #On garde les arbres d'origine
   # Initialisation des variables ####
-  
+  if (subRootTax == "none") subRootTax = taxo$node.label[1]
+  if (subRootPhy == "none") subRootPhy = phylo$node.label[1]
   mastlist = list(c(),c(),c()) # liste de stockage
   
   # Utiliser les subroot pour faire des sous arbres si la racine est différente
@@ -509,36 +547,22 @@ benchmark <- function(nbRepeats, nbLeaves, nb.move, phyType = "Normal", dist){
   return (metrics)
 }
 
-# Parallélisation du benchmark
-bench_par <- function(arglist){
+#' *Faire un essai !* 
+## Les feuilles bleues se déplacent près des violettes donc les feuilles bleues doivent
+## être absentes du résultat
+test_mast <- function(nbLeaves = 20, nb.move = 2, dist = 4, plot = T){
+  trees = createTaxPhyAlt(nbLeaves = nbLeaves, nb.move = nb.move, dist = dist, plot = plot)
   
-  Ncpus <- parallel::detectCores() - 2
-  cl <- parallel::makeCluster(Ncpus)
-  doParallel::registerDoParallel(cl)
+  ## Matrice d'enregistrement des résultats de mast en cours.
+  .GlobalEnv$doneMat = matrix(nrow = trees$taxo$Nnode, 
+                              ncol = trees$phylo$Nnode, 
+                              dimnames = list(trees$taxo$node.label, trees$phylo$node.label))
   
-  res <- foreach::foreach(i=1:length(arglist), 
-                   .export =c("benchmark", "createTaxPhyAlt", "mast", 
-                              "treeMetrics", "edgesToDf", "findBest", "plotChange"),
-                   .packages = c("ape","RcppHungarian", 
-                                 "stringr", "dplyr")) %dopar% {
-                                   return(do.call(what = benchmark, arglist[[i]]))
-                                 }
-  
-  parallel::stopCluster(cl)
-  return(res)
+  mastResults = mast(taxo = trees$taxo, phylo = trees$phylo)
+  return(mastResults)
 }
+test_mast()
 
-# Matrice d'enregistrement des résultats de mast en cours
-arbreTax = read.tree(text = "(88321MW415489,(114065FJ744633,(214818AY307287,67414FJ744632)Trichomycterus_areolatus,217709MW415500,(74829MT025536,(83205MT025525,55832MT025531)Trichomycterus_sp._Ireng_River,_spotted,109049MT025524,23039MW415505,23041MW415504,23042MW415503)unclassified_Trichomycterus,(104647MT025537,148904MT025539,156261MT025538,177480MT025521,217700MT025541,67884MT025540)Trichomycterus_cf._guianensis_CS-2020,114405MW415498,114406MW415507,60457MT025520,(97841MT025529,186318MT025542)Trichomycterus_conradi,78890FJ744634,85936MW415511,4292MW415496,56601MT025522,67417MW415499,85990MW415495,113830MW415497,139831MW415502,190648MW415501,223737MW415509,223738MW415510,23040MW415506,11211MW415508)Trichomycterus,23076MW415491,41801MW415490,95433FJ744654,193252MW415494,144015MW415492,100045MF034462,132740MW415493)Trichomycteridae;")
-arbrePhy = read.tree(text = "(97841MT025529:0.00816151,186318MT025542:0.02723544,(((((114405MW415498:0.00000001,114406MW415507:0.00000001)-1.000000:0.01160325,190648MW415501:0.03560576)0.000000:0.00000001,(114065FJ744633:0.00000001,((((4292MW415496:0.00000001,(74829MT025536:0.03081019,(104647MT025537:0.00573051,(156261MT025538:0.00560991,(148904MT025539:0.01138820,((78890FJ744634:0.00570487,177480MT025521:0.00000001)0.000000:0.00000001,(67884MT025540:0.00570830,217700MT025541:0.00000001)0.995400:0.00573843)0.000000:0.00000001)0.986069:0.00583811)0.776459:0.00573006)0.996569:0.02386099)0.960431:0.01710256)0.991276:0.01133714,(139831MW415502:0.01715573,(193252MW415494:0.01710248,(23076MW415491:0.00570430,85990MW415495:0.00000001)0.991898:0.00563693)0.000000:0.00000001)0.878478:0.00569388)0.985349:0.01166492,((67414FJ744632:0.00000001,67417MW415499:0.00000001)-1.000000:0.00000001,(214818AY307287:0.00000001,(88321MW415489:0.02401303,217709MW415500:0.02400579)0.993504:0.01716785)0.000000:0.00000001)0.987545:0.01147986)0.740649:0.00557221,(85936MW415511:0.00457814,((132740MW415493:0.04217838,100045MF034462:0.04006316)0.432619:0.00637168,((23041MW415504:0.00000001,(23040MW415506:0.00000001,(23039MW415505:0.00000001,23042MW415503:0.00000001)-1.000000:0.00000001)-1.000000:0.00000001)-1.000000:0.00567788,((223737MW415509:0.00000001,223738MW415510:0.00000001)-1.000000:0.00000001,11211MW415508:0.00577824)0.000000:0.00000001)0.598513:0.00630268)1.000000:0.04296149)0.690707:0.01426905)0.000000:0.00000001)0.999880:0.01740035)0.766683:0.00576124,(109049MT025524:0.04282250,(95433FJ744654:0.00000001,(113830MW415497:0.01147314,41801MW415490:0.02957742)0.697147:0.00564764)0.990191:0.01137542)0.000000:0.00000001)0.779738:0.00945626,((56601MT025522:0.02701379,144015MW415492:0.01534608)0.974591:0.01818942,(60457MT025520:0.01796059,(55832MT025531:0.00587535,83205MT025525:0.01144437)0.860528:0.00610458)0.954333:0.01547648)0.615901:0.01004039)0.984531:0.01747492);")
-
-arbrePhy = makeNodeLabel(arbrePhy, method ="number")
-
-.GlobalEnv$doneMat = matrix(nrow = arbreTax$Nnode, 
-                              ncol = arbrePhy$Nnode, 
-                              dimnames = list(arbreTax$node.label, arbrePhy$node.label))
-
-mast(taxo = arbreTax, phylo = arbrePhy, subRootTax = arbreTax$node.label[1], subRootPhy = arbrePhy$node.label[1])
 # Setup parallélistation ----
   toRun = list(list(200, 100, 1, "Alt", 3),
                list(200, 100, 3, "Alt", 3),

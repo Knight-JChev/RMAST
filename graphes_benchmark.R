@@ -1,7 +1,7 @@
 library(ggplot2)
 library(dplyr)
 
-dir = "Benchmark_data/"
+dir = "Benchmark_data/200rep_3a7dist_1a25moves/"
 metricsframe = data.frame()
 for (file in list.files(dir)){
   if (!(dir.exists(paste0(dir,file)))){
@@ -73,8 +73,7 @@ metricsframe2 = arrange(mutate(metricsframe, nb.move = factor(nb.move, levels = 
     geom_text(aes(x = dist, y = nb.move, label = normVal), col = "mistyrose", size = 6) +
     geom_text(aes(x = dist, y = nb.move, label = compte_faux), col = "white", nudge_y = -0.3, size = 4) + 
     scale_fill_viridis_c(begin = 0.2, end = 0.6, direction = -1, option = "plasma")+
-    labs (title = "Proportion de feuilles déplacées retenues",
-          subtitle = paste0("200 arbres de 100 feuilles par case"),
+    labs (subtitle = paste0("200 arbres de 100 feuilles par case"),
           x = "Distance de déplacement",
           y = "Nombre de feuilles déplacées",
           fill = "Proportion \n d'erreur")+
