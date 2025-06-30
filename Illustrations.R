@@ -15,9 +15,9 @@ ape::write.tree(a)
 # Exemple humain:plante ####
 layout(matrix(c(1,2,3),1,3))
 
-a = read.tree(text = "(((Plante1:1,Plante2:1)d:1,(Plante3:1,Plante4:1)e:1)b:1,((Plante5:1,Plante6:1)f:1,(Plante7:1,Humain:1)g:1)c:1)a;")
-b = read.tree(text = "(((Plante1:1,Plante2:1)d:1,(Plante3:1,Plante4:1)e:1)b:1,((Plante5:1,Plante6:1)f:1,(Plante7:1)g:1)c:1,Humain:3)a;")
-c = read.tree(text = "(((Plante1:1,Plante2:1)d:1,(Plante3:1,Plante4:1)e:1)b:1,((Plante5:1,Plante6:1)f:1,(Plante7:1)g:1)c:1)a;")
+a = read.tree(text = "(((Mammifère1:1.0):1.0,(Mammifère2:1.0,Mammifère3:1.0):1.0):1.0,((Plante5:1.0,Plante6:1.0):1.0,(Plante7:1.0,Humain: 1.0):1.0):1.0);")
+b = read.tree(text = "(((Humain: 1.0,Mammifère1:1.0):1.0,(Mammifère2:1.0,Mammifère3:1.0):1.0):1.0,((Plante5:1.0,Plante6:1.0):1.0,(Plante7:1.0):1.0):1.0);")
+c = read.tree(text = "(((Mammifère1:1.0):1.0,(Mammifère2:1.0,Mammifère3:1.0):1.0):1.0,((Plante5:1.0,Plante6:1.0):1.0,(Plante7:1.0):1.0):1.0);")
 
 plot.phylo(a, show.node.label = F, cex = 2.5)
 plot(b, cex = 2.5)
@@ -31,9 +31,11 @@ a = read.tree(text = "(((a:1,b:1):1,c:1):1,((d:1,e:1):1,f:1):1);")
 b = read.tree(text = "(((a:1,c:1):1,b:1):1,((d:1,e:1):1,f:1):1);")
 
 png("./graphes/kast_a1.png", width = 350, height = 550)
-plot(a)
+plot(a, direction = "downwards")
+makeNodeLabel(phy = a, method = c("1","2","3","4","5"))
 tiplabels(a$tip.label, cex = 2.2, frame = "c", col = c("black"), 
-          bg = c("cyan2","lemonchiffon","mediumpurple",rep("coral1",3)) , srt=90)
+          bg = c("cyan2","lemonchiffon","mediumpurple",rep("coral1",3)))
+nodelabels(a$node)
 dev.off()
 
 png("./graphes/kast_b1.png", width = 350, height = 550)
