@@ -204,8 +204,8 @@ plotPhy <- function(taxPhy, phy, corr = F, corrTree = "phylo"){
             adj=0, bg = "mediumpurple1", font = 2, cex = 1)
   tiplabels(taxPhy$taxo$tip.label[taxPhy$tipMoved], taxPhy$tipMovedTo,
             adj=0, frame = "r", bg = "lightblue", font = 2, cex = 1)
-  nodelabels(taxPhy[[phy]]$node.label, adj = nodePos, frame = "n", 
-             cex = 0.8, font = 2, col=nodeCol)
+  #nodelabels(taxPhy[[phy]]$node.label, adj = nodePos, frame = "n", 
+   #          cex = 0.8, font = 2, col=nodeCol)
 } # Plot la Phylo
 plotTaxPhy <- function(taxPhy, taxo = "taxo", phy = "phylo", corr = F){
   par(xpd = TRUE) # Permettre à la légende de sortir un peu
@@ -218,7 +218,7 @@ plotTaxPhy <- function(taxPhy, taxo = "taxo", phy = "phylo", corr = F){
             adj=0, font = 2, cex = 1, bg = "mediumpurple1")
   tiplabels(taxPhy$taxo$tip.label[taxPhy$tipMoved], taxPhy$tipMoved, frame = "r",
             adj=0, bg = "lightblue", font = 2, cex = 1)
-  nodelabels(taxPhy$taxo$node.label, adj = c(1,-0.2), frame = "n", cex = 0.8, font = 2, col="red")
+  #nodelabels(taxPhy$taxo$node.label, adj = c(1,-0.2), frame = "n", cex = 0.8, font = 2, col="red")
   
   plotPhy(taxPhy, phy = "phylo")
   
@@ -446,7 +446,7 @@ mast <- function(taxo, phylo, subRootTax = "none", subRootPhy = "none"){ #On gar
 }
 
 # Benchmark sur des arbres aléatoires
-benchmark <- function(nbRepeats, nbLeaves, nb.move, phyType = "Alt", dist){
+benchmark <- function(nbRepeats, nbLeaves, nb.move, phyType="Alt", dist){
   # Dossiers et fichiers de stockage
   time = format(Sys.time(), "%H%M%S")
   if (phyType == "Alt"){
@@ -459,7 +459,6 @@ benchmark <- function(nbRepeats, nbLeaves, nb.move, phyType = "Alt", dist){
 
   # Variable de stockage des résultats
   metrics = data.frame() 
-  
   
   # Boucle pour atteindre le nombre de répétitions
   print(paste0("Tree 1 / ",nbRepeats, " ongoing"))
@@ -557,11 +556,11 @@ test_mast <- function(nbLeaves = 20, nb.move = 2, dist = 4, plot = T){
   mastResults = mast(taxo = trees$taxo, phylo = trees$phylo)
   return(mastResults)
 }
-test_mast()
+test_mast(nbLeaves = 30, nb.move = 5, dist = 5, plot = T)
 
 # Lancement manuel d'un benchmark ####
 #' 
-x = benchmark(nbRepeats = 30, nbLeaves = 20, nb.move = 1, dist = 3, phyType = "Alt")
+x = benchmark(nbRepeats = 3, nbLeaves = 20, nb.move = 1, dist = 3, phyType = "Alt")
 
 
 
@@ -585,16 +584,16 @@ bench_par <- function(arglist){
 }
 
 # Setup parallélistation ----
-  toRun = list(list(200, 100, 1, "Alt", 3),
-               list(200, 100, 3, "Alt", 3),
-               list(200, 100, 5, "Alt", 3),
-               list(200, 100, 10, "Alt", 3),
-               list(200, 100, 15, "Alt", 3),
-               list(200, 100, 20, "Alt", 3),
-               list(200, 100, 25, "Alt", 3))
+  toRun = list(list(nbRepeats = 200, nbLeaves = 100, nb.move = 1, dist = 3, phyType = "Alt"),
+               list(nbRepeats = 200, nbLeaves = 100, nb.move = 3, dist = 3, phyType = "Alt"),
+               list(nbRepeats = 200, nbLeaves = 100, nb.move = 5, dist = 3, phyType = "Alt"),
+               list(nbRepeats = 200, nbLeaves = 100, nb.move = 10, dist = 3, phyType = "Alt"),
+               list(nbRepeats = 200, nbLeaves = 100, nb.move = 15, dist = 3, phyType = "Alt"),
+               list(nbRepeats = 200, nbLeaves = 100, nb.move = 20, dist = 3, phyType = "Alt"),
+               list(nbRepeats = 200, nbLeaves = 100, nb.move = 25, dist = 3, phyType = "Alt"))
 
   x = bench_par(toRun)
 
-
+# Test mast
+  tree = createTaxPhyAlt(nbLeaves = 30, nb.move = 5, dist = 3, plot = T)
   
-       

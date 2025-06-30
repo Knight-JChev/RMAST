@@ -2,7 +2,7 @@ library(ggplot2)
 library(dplyr)
 
 # Charger l'exemple ####
-metricsframe2 = readRDS("./Example_banchmark_data")
+metricsframe2 = readRDS("./Example_benchmark_data")
 
 # OU Formatage des données du benchmark ####
 dir = "Benchmark_data/200rep_3a7dist_1a25moves/"
@@ -28,7 +28,7 @@ mieux = metricsframe2 %>% group_by(nbLeaves, nbRepeats, nb.move, dist) %>%
 ggplot(mieux) +
   geom_tile(aes(x = dist, y = nb.move, fill = normVal)) +
   geom_text(aes(x = dist, y = nb.move, label = normVal), col = "mistyrose", size = 6) +
-  geom_text(aes(x = dist, y = nb.move, label = compte_faux), col = "white", nudge_y = -0.3, size = 4) + 
+  #geom_text(aes(x = dist, y = nb.move, label = compte_faux), col = "white", nudge_y = -0.3, size = 4) + 
   scale_fill_viridis_c(begin = 0.2, end = 0.6, direction = -1, option = "plasma")+
   labs (subtitle = paste0("200 arbres de 100 feuilles par case"),
         x = "Distance de déplacement",
@@ -50,3 +50,4 @@ ggplot(mieux) +
   scale_y_discrete(expand = c(0,0)) +
   scale_x_discrete(expand = c(0,0))
   
+saveRDS (metricsframe2, "Example_benchmark_data")
